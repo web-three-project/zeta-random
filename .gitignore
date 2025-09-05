@@ -1,0 +1,9 @@
+/node_modules
+/contract/out
+.env
+/contract/broadcast
+/contract/test
+/contract/cache
+/contract/build
+/contract/lib
+/contract/node_modules

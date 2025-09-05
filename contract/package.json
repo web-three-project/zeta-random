@@ -1,0 +1,11 @@
+{
+  "name": "zeta-gacha-staking",
+  "version": "1.0.0",
+  "description": "ZetaChain Gacha Staking Contract with Pyth Entropy",
+  "dependencies": {
+    "@pythnetwork/entropy-sdk-solidity": "^2.0.0"
+  },
+  "scripts": {
+    "install": "npm install"
+  }
+}
