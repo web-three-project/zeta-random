@@ -4,7 +4,6 @@ pragma solidity ^0.8.19;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
 
 // Official Pyth Entropy SDK imports
 import "@pythnetwork/entropy-sdk-solidity/IEntropy.sol";
@@ -18,7 +17,6 @@ import "@pythnetwork/entropy-sdk-solidity/IEntropyConsumer.sol";
  * Prize tiers match front.jsx exactly
  */
 contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsumer {
-    using Strings for uint256;
     // Constants
     uint256 public constant FIXED_PRIZE_POOL = 5000 ether; // 5000 ZETA
     uint256 public constant STAKE_AMOUNT = 1 ether; // 1 ZETA per participation
@@ -284,82 +282,6 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
         uint128 entropyFee = entropy.getFee(entropyProvider);
         if (entropyFee >= STAKE_AMOUNT) return 0;
         return STAKE_AMOUNT - entropyFee;
-    }
-
-    /**
-     * @dev Helper: prizePoolBalance in human-readable ZETA (as decimal string with up to 18 decimals)
-     */
-    function prizePoolBalanceZeta() external view returns (string memory) {
-        return _formatZeta(prizePoolBalance);
-    }
-
-    /**
-     * @dev Helper: totalStakesCollected in human-readable ZETA (as decimal string with up to 18 decimals)
-     */
-    function totalStakesCollectedZeta() external view returns (string memory) {
-        return _formatZeta(totalStakesCollected);
-    }
-
-    /**
-     * @dev Helper: actual stake amount after entropy fee, in ZETA (as decimal string with up to 18 decimals)
-     */
-    function getActualStakeAmountZeta() external view returns (string memory) {
-        uint128 entropyFee = entropy.getFee(entropyProvider);
-        if (entropyFee >= STAKE_AMOUNT) return "0";
-        return _formatZeta(STAKE_AMOUNT - entropyFee);
-    }
-
-    /**
-     * @dev Internal: format wei amount into ZETA decimal string with up to 18 decimals (trim trailing zeros)
-     */
-    function _formatZeta(uint256 weiAmount) internal pure returns (string memory) {
-        uint256 whole = weiAmount / 1e18;
-        uint256 frac = weiAmount % 1e18;
-
-        if (frac == 0) {
-            return whole.toString();
-        }
-
-        // Convert fraction to 18-digit string with leading zeros
-        string memory fracRaw = _pad18(frac.toString());
-        // Trim trailing zeros
-        bytes memory b = bytes(fracRaw);
-        uint256 len = b.length;
-        while (len > 0 && b[len - 1] == bytes1("0")) {
-            len--;
-        }
-        if (len == 0) {
-            return whole.toString();
-        }
-        return string(abi.encodePacked(whole.toString(), ".", _slice(b, 0, len)));
-    }
-
-    /**
-     * @dev Pad a decimal string on the left with zeros to 18 characters
-     */
-    function _pad18(string memory s) internal pure returns (string memory) {
-        bytes memory bs = bytes(s);
-        if (bs.length >= 18) return s;
-        bytes memory out = new bytes(18);
-        uint256 pad = 18 - bs.length;
-        for (uint256 i = 0; i < pad; i++) {
-            out[i] = bytes1("0");
-        }
-        for (uint256 j = 0; j < bs.length; j++) {
-            out[pad + j] = bs[j];
-        }
-        return string(out);
-    }
-
-    /**
-     * @dev Slice first `len` bytes from `data` starting at `start`
-     */
-    function _slice(bytes memory data, uint256 start, uint256 len) internal pure returns (string memory) {
-        bytes memory out = new bytes(len);
-        for (uint256 i = 0; i < len; i++) {
-            out[i] = data[start + i];
-        }
-        return string(out);
     }
     
     /**
