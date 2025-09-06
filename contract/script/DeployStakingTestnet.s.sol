@@ -7,46 +7,38 @@ import "../src/ZetaGachaStakingTestnet.sol";
 contract DeployStakingTestnetScript is Script {
     function run() external {
         // Load environment variables
-        address finalRecipientAddress = vm.envAddress("FINAL_RECIPIENT_ADDRESS");
         address pythEntropy = vm.envAddress("PYTH_ENTROPY_ADDRESS");
         address pythProvider = vm.envAddress("PYTH_ENTROPY_PROVIDER");
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_DEPLOYER");
-        
+
         vm.startBroadcast(deployerPrivateKey);
-        
-        // Deploy ZetaGachaStakingTestnet contract (scaled down for easy testing)
+
+        // Deploy ZetaGachaStakingTestnet contract
         ZetaGachaStakingTestnet gacha = new ZetaGachaStakingTestnet(
-            finalRecipientAddress,
             pythEntropy,
             pythProvider
         );
-        
+
         vm.stopBroadcast();
-        
+
         console.log("ZetaGachaStakingTestnet deployed at:", address(gacha));
-        console.log("Final recipient address:", finalRecipientAddress);
         console.log("Pyth Entropy contract:", pythEntropy);
         console.log("Pyth Entropy provider:", pythProvider);
-        console.log("Fixed prize pool: 0.5 ZETA (scaled down for testing)");
-        console.log("Stake amount: 0.0001 ZETA per participation");
-        
-        console.log("\n=== Prize Tiers (TESTNET - scaled 1:10000) ===");
-        console.log("Tier 0: No prize (50% chance)");
-        console.log("Tier 1: 0.0001 ZETA (40% chance, unlimited)");
-        console.log("Tier 2: 0.001 ZETA (9.5% chance, max 200)");
-        console.log("Tier 3: 0.01 ZETA (0.4% chance, max 10)");
-        console.log("Tier 4: 0.1 ZETA (0.1% chance, max 2)");
-        
-        console.log("\n=== Budget Verification ===");
-        console.log("0.001 ZETA x 200 = 0.2 ZETA");
-        console.log("0.01 ZETA x 10 = 0.1 ZETA");
-        console.log("0.1 ZETA x 2 = 0.2 ZETA");
-        console.log("Total budget: 0.5 ZETA");
-        
+        console.log("Fixed prize pool: 5 ZETA (for testnet)");
+        console.log("Participation: Free (user pays gas + entropy fee)");
+        console.log("Draw limit: 30 per address (lifetime)");
+
+        console.log("\n=== Prize Tiers (TESTNET with scaled inventory) ===");
+        console.log("Probabilities are the same as mainnet.");
+        console.log("0.2 ZETA: 5 supply");
+        console.log("1 ZETA: 1 supply");
+        console.log("10 ZETA: 1 supply (for testing insufficient funds)");
+        console.log("Merch: 2 supply");
+        console.log("Higher tiers: 0 supply");
+
         console.log("\n=== Next Steps ===");
-        console.log("1. Owner needs to call seedPrizePool() with 0.5 ZETA");
-        console.log("2. Users can call participateAndDraw() with 0.0001 ZETA");
-        console.log("3. Owner can call endActivity() to end the activity");
-        console.log("4. Extremely easy to test with minimal amounts!");
+        console.log("1. Owner must call seedPrizePool() with 5 ZETA.");
+        console.log("2. Users can call participateAndDraw(), sending the exact entropy fee as msg.value.");
+        console.log("3. Owner can call endActivity() to halt the contract.");
     }
 }
