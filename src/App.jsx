@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { WagmiConfig, createConfig, http, useAccount, useConnect, useDisconnect, useChainId, useSwitchChain, useConfig } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { defineChain, formatUnits } from "viem";
-import { readEntropyFee, getInventoryStatus } from "./lib/contract";
+import { readEntropyFee, getInventoryStatus, participateAndDraw, randomBytes32, onDrawCompleted } from "./lib/contract";
 
 /**
  * Zeta Gluck – Scratch Card（单文件 React App）
@@ -453,6 +453,7 @@ function MainApp() {
   const chainId = useChainId();
   const { switchChainAsync } = useSwitchChain();
   const config = useConfig();
+  const [unwatchDrawCompleted, setUnwatchDrawCompleted] = useState(null);
 
   const formatAddress = (addr) => {
     if (!addr) return "";
@@ -493,27 +494,35 @@ function MainApp() {
       return;
     }
 
-    // 临时：打印 getCurrentEntropyFee 值
-    try {
-      const contractAddress = process.env.REACT_APP_CONTRACT_ADDRESS;
-      if (!contractAddress) {
-        console.warn("[debug] 未设置合约地址环境变量 REACT_APP_CONTRACT_ADDRESS，无法读取 entropy fee");
-      } else {
-        const fee = await readEntropyFee({ config, contractAddress });
-        console.log("[debug] getCurrentEntropyFee (wei):", fee?.toString?.() ?? fee);
-      }
-    } catch (err) {
-      console.error("[debug] 读取 getCurrentEntropyFee 失败:", err);
+    // 发起链上交易：participateAndDraw(bytes32) with exact entropy fee
+    const contractAddress = process.env.REACT_APP_CONTRACT_ADDRESS;
+    if (!contractAddress) {
+      alert("未配置合约地址（REACT_APP_CONTRACT_ADDRESS）。请在 .env 中设置后重试。");
+      return;
     }
 
-    setStage("paying");
-    setTimeout(() => {
-      const prizeKey = drawPrize(inventory);
-      const meta = BASE_WEIGHTS.find((w) => w.key === prizeKey) || { value: 0 };
-      const extra = prizeKey === "merch" ? { label: inventory.merch.label } : {};
-      setPrize({ key: prizeKey, value: meta.value, ...extra });
-      setStage("scratching");
-    }, 1000);
+    try {
+      setStage("paying");
+      const fee = await readEntropyFee({ config, contractAddress });
+      const userRandomNumber = randomBytes32(); // 使用浏览器安全随机作为 bytes32（优于纯时间戳）
+      console.log("[tx] participateAndDraw fee:", fee?.toString?.() ?? fee, " userRandom:", userRandomNumber);
+
+      const receipt = await participateAndDraw({
+        config,
+        contractAddress,
+        userRandomNumber,
+        value: fee,
+      });
+      console.log("[tx] participateAndDraw mined, hash:", receipt?.transactionHash || receipt?.hash);
+
+      // 等待回执后，结果将通过合约事件异步返回，这里不立即开始本地抽奖
+      // 刷新链上库存（数量会在 Entropy 回调分发后更新，可能略有延迟）
+      void fetchInventory();
+    } catch (err) {
+      console.error("[tx] participateAndDraw failed:", err);
+      alert("交易失败或被取消，请重试。");
+      return;
+    }
   }
 
   function instantStart() {
@@ -532,8 +541,68 @@ function MainApp() {
   }
 
   function reset() {
-    instantStart();
+    // 再来一张 → 走与“免费来一张”相同的链上交互流程
+    payAndStart();
   }
+
+  // 将合约事件映射为前端 prize 数据
+  function mapTierToPrize(tierIndex, amountWei) {
+    if (tierIndex === 1) {
+      return { key: "merch", value: 0, label: I18N[lang].merchLabel };
+    }
+    try {
+      const amountStr = formatUnits(amountWei, 18);
+      const amount = parseFloat(amountStr);
+      if (amount >= 999.999) return { key: "thousand", value: 1000 };
+      if (amount >= 99.999) return { key: "hundred", value: 100 };
+      if (amount >= 9.999) return { key: "ten", value: 10 };
+      if (amount >= 0.999) return { key: "one", value: 1 };
+      if (amount >= 0.49) return { key: "zeropointtwo", value: 0.5 }; // 测试网为 0.5
+      return { key: "none", value: 0 };
+    } catch {
+      return { key: "none", value: 0 };
+    }
+  }
+
+  // 监听 DrawCompleted 事件，仅接收当前连接地址的结果
+  useEffect(() => {
+    const contractAddress = process.env.REACT_APP_CONTRACT_ADDRESS;
+    if (!contractAddress || !isConnected || !address) return;
+    // 清理之前的监听
+    if (unwatchDrawCompleted) {
+      try { unwatchDrawCompleted(); } catch {}
+      setUnwatchDrawCompleted(null);
+    }
+    const unwatch = onDrawCompleted({
+      config,
+      contractAddress,
+      listener: (logs) => {
+        for (const log of logs) {
+          try {
+            const args = log.args || log;
+            const player = args.player?.toLowerCase?.() || args[0]?.toLowerCase?.();
+            if (!player || player !== address.toLowerCase()) continue;
+            const tierIndex = Number(args.tierIndex ?? args[1] ?? 0);
+            const amount = args.amount ?? args[2] ?? 0n;
+            const prizeData = mapTierToPrize(tierIndex, amount);
+            setPrize(prizeData);
+            setStage("scratching");
+            // 收到结果后，可刷新库存
+            void fetchInventory();
+            break;
+          } catch (e) {
+            console.warn("[event] parse DrawCompleted failed", e);
+          }
+        }
+      }
+    });
+    setUnwatchDrawCompleted(() => unwatch);
+    return () => {
+      try { unwatch(); } catch {}
+      setUnwatchDrawCompleted(null);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config, isConnected, address]);
 
   // 从链上读取库存
   function formatZetaAmount(wei) {
