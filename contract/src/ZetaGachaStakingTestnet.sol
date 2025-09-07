@@ -17,7 +17,7 @@ import "@pythnetwork/entropy-sdk-solidity/IEntropyConsumer.sol";
  */
 contract ZetaGachaStakingTestnet is Ownable, ReentrancyGuard, Pausable, IEntropyConsumer {
     // ---------------- Constants ----------------
-    uint256 public constant FIXED_PRIZE_POOL = 5 ether; // 固定奖池
+    uint256 public constant FIXED_PRIZE_POOL = 0.6 ether; // 固定奖池
     uint256 private constant PROB_DENOMINATOR = 1_000_000; // 百万分比 (ppm)
 
     // ---------------- Prize Tier 定义 ----------------
@@ -32,7 +32,7 @@ contract ZetaGachaStakingTestnet is Ownable, ReentrancyGuard, Pausable, IEntropy
     // 奖励层级索引
     uint8 public constant T_NONE         = 0;
     uint8 public constant T_MERCH        = 1;  // 实物奖品（0 ZETA）
-    uint8 public constant T_ZEROPOINTTWO = 2;  // 0.2 ZETA
+    uint8 public constant T_ZEROPOINTFIVE = 2;  // 0.5 ZETA
     uint8 public constant T_ONE          = 3;  // 1 ZETA
     uint8 public constant T_TEN          = 4;  // 10 ZETA
     uint8 public constant T_HUNDRED      = 5;  // 100 ZETA
@@ -77,9 +77,9 @@ contract ZetaGachaStakingTestnet is Ownable, ReentrancyGuard, Pausable, IEntropy
         entropyProvider = _entropyProvider;
 
         // 初始化奖励层级
-        prizeTiers[T_NONE] = PrizeTier(0, 444_450, 0, 0, true);
+        prizeTiers[T_NONE] = PrizeTier(0, 744_450, 0, 0, true);
         prizeTiers[T_MERCH] = PrizeTier(0, 0, 10, 10, false);
-        prizeTiers[T_ZEROPOINTTWO] = PrizeTier(0.2 ether, 500_000, 5000, 5000, false);
+        prizeTiers[T_ZEROPOINTFIVE] = PrizeTier(0.5 ether, 500_000, 2000, 2000, false);        
         prizeTiers[T_ONE] = PrizeTier(1 ether, 50_000, 1000, 1000, false);
         prizeTiers[T_TEN] = PrizeTier(10 ether, 5_000, 100, 100, false);
         prizeTiers[T_HUNDRED] = PrizeTier(100 ether, 500, 10, 10, false);
@@ -105,10 +105,10 @@ contract ZetaGachaStakingTestnet is Ownable, ReentrancyGuard, Pausable, IEntropy
     }
 
     function withdrawRemainingPrizePool() external onlyOwner {
-        if (!activityEnded) revert ActivityNotEnded();
-        uint256 remaining = prizePoolBalance;
+    if (!activityEnded) revert ActivityNotEnded();
+        uint256 remaining = address(this).balance; // 取合约真实余额
         if (remaining > 0) {
-            prizePoolBalance = 0;
+            prizePoolBalance = 0; // 可选：清零逻辑余额
             (bool success, ) = owner().call{value: remaining}("");
             require(success, "Prize pool withdrawal failed");
         }
