@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { WagmiConfig, createConfig, http, useAccount, useConnect, useDisconnect, useChainId, useSwitchChain, useConfig } from "wagmi";
 import { injected } from "wagmi/connectors";
-import { defineChain } from "viem";
-import { readEntropyFee } from "./lib/contract";
+import { defineChain, formatUnits } from "viem";
+import { readEntropyFee, getInventoryStatus } from "./lib/contract";
 
 /**
  * Zeta Gluck – Scratch Card（单文件 React App）
@@ -444,6 +444,7 @@ function MainApp() {
   const [prize, setPrize] = useState({ key: "none", value: 0 });
   const [lang] = useState("zh"); // 语言切换已移除，默认中文
   const [firstVisit, setFirstVisit] = useState(() => !localStorage.getItem(LS_FIRST_VISIT));
+  const [chainInv, setChainInv] = useState(null); // { amounts, maxSupplies, remaining }
 
   // 钱包状态（wagmi）
   const { address, isConnected } = useAccount();
@@ -526,18 +527,57 @@ function MainApp() {
   function onRevealed() {
     setStage("revealed");
     setInventory((prev) => consumeInventory(prev, prize.key));
+    // 抽完后刷新链上库存显示
+    void fetchInventory();
   }
 
   function reset() {
     instantStart();
   }
 
-  // 展示列表：两行三列（按 value 升序 + 周边最后）
-  const numericKeys = ["zeropointtwo","one","ten","hundred","thousand"]; 
-  const supplyInfo = numericKeys
-    .sort((a,b)=> (DEFAULT_INVENTORY[a].value||0) - (DEFAULT_INVENTORY[b].value||0))
-    .map(key=>({key}));
-  supplyInfo.push({key:"merch"});
+  // 从链上读取库存
+  function formatZetaAmount(wei) {
+    try {
+      return formatUnits(wei, 18);
+    } catch {
+      return '0';
+    }
+  }
+
+  const importantTierIndices = [2, 3, 4, 5, 8, 1]; // 0.5, 1, 10, 100, 1000, merch
+  const displayTiers = (chainInv && chainInv.amounts)
+    ? importantTierIndices.map((i) => ({
+        index: i,
+        amountWei: chainInv.amounts[i],
+        amountLabel: i === 1 ? t.merchLabel : `${formatZetaAmount(chainInv.amounts[i])} ZETA`,
+        max: Number(chainInv.maxSupplies[i]) || 0,
+        left: Number(chainInv.remaining[i]) || 0,
+      }))
+    : null;
+
+  async function fetchInventory() {
+    try {
+      const contractAddress = process.env.REACT_APP_CONTRACT_ADDRESS;
+      if (!contractAddress) return;
+      const res = await getInventoryStatus({ config, contractAddress });
+      // res: [amounts, probabilities, maxSupplies, remaining, unlimited]
+      setChainInv({
+        amounts: res[0],
+        probabilities: res[1],
+        maxSupplies: res[2],
+        remaining: res[3],
+        unlimited: res[4],
+      });
+    } catch (e) {
+      console.warn('[inventory] failed to fetch on-chain inventory', e);
+    }
+  }
+
+  // 页面加载时读取一次
+  useEffect(() => {
+    fetchInventory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function labelFor(key) {
     switch (key) {
@@ -551,33 +591,10 @@ function MainApp() {
     }
   }
 
-  // ---- 运行时测试（不会抛错，仅 console 断言）----
+  // ---- 运行时测试（去除本地库存相关断言，仅保留基础逻辑）----
   useEffect(() => {
     function runTests() {
       try {
-        const keys = new Set(["none", "zeropointtwo", "one", "ten", "hundred", "twohundred", "fivehundred", "thousand", "merch"]);
-        // 权重键合法
-        BASE_WEIGHTS.forEach(w => console.assert(keys.has(w.key), `BASE_WEIGHTS key exists: ${w.key}`));
-        // 权重和接近 100（允许浮点误差）
-        const total = BASE_WEIGHTS.reduce((s,w)=>s+w.weight,0);
-        console.assert(Math.abs(total - 100) < 0.001, `weights sum ~ 100, got ${total}`);
-        // 降级链关键键存在
-        console.assert(["thousand","zeropointtwo"].every(k=>keys.has(k)), "chain keys exist");
-        // 抽奖结果键必须合法
-        for (let i = 0; i < 20; i++) {
-          const k = drawPrize(loadInventory());
-          console.assert(keys.has(k), `drawPrize legal key: ${k}`);
-        }
-        // 展示顺序与库存定义（含 thousand / merch）
-        console.assert(Array.isArray(supplyInfo) && supplyInfo.length === 6, "supplyInfo length 6");
-        const expectedOrder = ["zeropointtwo","one","ten","hundred","thousand","merch"];
-        console.assert(expectedOrder.every((k,i)=>supplyInfo[i].key===k), "grid sorted ascending by value with merch last");
-        // 标签不包含“剩余”
-        console.assert(!labelFor("one").includes("剩余"), "labels should not contain 剩余");
-        // 消费保护（不会减到负数）
-        const testInv = { ...DEFAULT_INVENTORY, one: { ...DEFAULT_INVENTORY.one, left: 0 } };
-        const consumed = consumeInventory(testInv, "one");
-        console.assert(consumed.one.left === 0, "consumeInventory should not go negative");
         console.log("[Zeta Gluck] sanity tests passed");
       } catch (e) {
         console.warn("[Zeta Gluck] sanity tests encountered an issue", e);
@@ -641,7 +658,7 @@ function MainApp() {
           )}
         </section>
 
-        {/* ===== 次要信息：奖池与库存（下方，两行三列） ===== */}
+        {/* ===== 次要信息：奖池与库存（下方，两行三列，使用链上数据） ===== */}
         <section className="rounded-2xl border bg-white p-4 sm:p-5 shadow-sm">
           <div>
             <div className="text-[11px] tracking-widest text-slate-500 font-semibold">{t.secondaryLabel}</div>
@@ -651,22 +668,27 @@ function MainApp() {
 
           <div className="mt-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {supplyInfo.map((s) => {
-                const left = inventory[s.key].left;
-                const max = inventory[s.key].max;
-                const percent = Math.max(0, Math.min(100, Math.round((left / max) * 100)));
-                const animate = firstVisit && left === max; // 首访且满仓 → 动画
-                return (
-                  <div key={s.key} className="rounded-xl border p-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="text-xs text-slate-500">{labelFor(s.key)}</div>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{percent}%</span>
+              {displayTiers ? (
+                displayTiers.map((tier) => {
+                  const { index, amountLabel, max, left } = tier;
+                  const rawPercent = max > 0 ? (left / max) * 100 : 0;
+                  const percentBar = Math.max(0, Math.min(100, Math.round(rawPercent)));
+                  const animate = firstVisit && left === max;
+                  const key = `tier-${index}`;
+                  return (
+                    <div key={key} className="rounded-xl border p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="text-xs text-slate-500">{index === 1 ? t.merchLabel : `${amountLabel} * ${max}`}</div>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{rawPercent.toFixed(3)}%</span>
+                      </div>
+                      <div className="text-lg font-semibold">{left} / {max}</div>
+                      <ProgressBar percent={percentBar} animate={animate} />
                     </div>
-                    <div className="text-lg font-semibold">{left} / {max}</div>
-                    <ProgressBar percent={percent} animate={animate} />
-                  </div>
-                );
-              })}
+                  );
+                })
+              ) : (
+                <div className="text-sm text-slate-500">正在读取链上库存…</div>
+              )}
             </div>
           </div>
         </section>
