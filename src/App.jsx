@@ -1,4 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
+import { WagmiConfig, createConfig, http, useAccount, useConnect, useDisconnect, useChainId, useSwitchChain, useConfig } from "wagmi";
+import { injected } from "wagmi/connectors";
+import { defineChain } from "viem";
+import { readEntropyFee } from "./lib/contract";
 
 /**
  * Zeta Gluck – Scratch Card（单文件 React App）
@@ -7,6 +11,28 @@ import React, { useEffect, useRef, useState } from "react";
  * - 解决 GiftCard JSX 结构中多余 </div> 导致的 “Adjacent JSX elements…” 报错。
  * - 保持你已要求的改动：无语言切换、百分比无“剩余”、网格按 0.2→1→10→100→1000→周边 排序、刮奖卡片“来自”无 logo。
  */
+
+// ---- wagmi / viem 配置（ZetaChain Athens Testnet）----
+const zetaAthens = defineChain({
+  id: 7001,
+  name: "ZetaChain Athens Testnet",
+  nativeCurrency: { name: "ZETA", symbol: "ZETA", decimals: 18 },
+  rpcUrls: {
+    default: { http: ["https://zetachain-athens-evm.blockpi.network/v1/rpc/public"] },
+    public: { http: ["https://zetachain-athens-evm.blockpi.network/v1/rpc/public"] },
+  },
+  blockExplorers: {
+    default: { name: "ZetaScan", url: "https://athens.explorer.zetachain.com" },
+  },
+});
+
+const wagmiConfig = createConfig({
+  chains: [zetaAthens],
+  connectors: [injected()],
+  transports: {
+    [zetaAthens.id]: http(zetaAthens.rpcUrls.default.http[0]),
+  },
+});
 
 // ---- 工具：本地持久化 ----
 const LS_KEY = "zeta_scratch_inventory_v4"; // 升级版本以便切换到新奖池（0.2 档）
@@ -412,12 +438,25 @@ function ReceiptAnimation({ show, t }) {
 }
 
 // ---- 主页面 ----
-export default function App() {
+function MainApp() {
   const [inventory, setInventory] = useState(loadInventory());
   const [stage, setStage] = useState("idle"); // idle → paying → scratching → revealed
   const [prize, setPrize] = useState({ key: "none", value: 0 });
   const [lang] = useState("zh"); // 语言切换已移除，默认中文
   const [firstVisit, setFirstVisit] = useState(() => !localStorage.getItem(LS_FIRST_VISIT));
+
+  // 钱包状态（wagmi）
+  const { address, isConnected } = useAccount();
+  const { connectAsync, connectors } = useConnect();
+  const { disconnect } = useDisconnect();
+  const chainId = useChainId();
+  const { switchChainAsync } = useSwitchChain();
+  const config = useConfig();
+
+  const formatAddress = (addr) => {
+    if (!addr) return "";
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  };
 
   useEffect(() => {
     if (firstVisit) localStorage.setItem(LS_FIRST_VISIT, "1");
@@ -425,7 +464,47 @@ export default function App() {
 
   const t = I18N[lang];
 
-  function payAndStart() {
+  useEffect(() => {
+    console.log("isConnected", isConnected);
+    console.log("chainId", chainId);
+  }, [isConnected,chainId])
+
+  async function payAndStart() {
+    // 未连接钱包则尝试连接
+    if (!isConnected) {
+      try {
+        const preferred = connectors.find((c) => c.id === "injected") || connectors[0];
+        if (!preferred) throw new Error("no-connector");
+        await connectAsync({ connector: preferred });
+      } catch (e) {
+        alert("请先连接钱包（支持浏览器钱包，如 MetaMask 或 OKX）。");
+        return;
+      }
+    }
+
+    // 确保当前网络为 ZetaChain Athens Testnet (7001)
+    try {
+      if (chainId !== zetaAthens.id) {
+        await switchChainAsync({ chainId: zetaAthens.id });
+      }
+    } catch (e) {
+      alert("请在钱包中切换到 ZetaChain Athens Testnet (chainId: 7001) 后重试。");
+      return;
+    }
+
+    // 临时：打印 getCurrentEntropyFee 值
+    try {
+      const contractAddress = process.env.REACT_APP_CONTRACT_ADDRESS;
+      if (!contractAddress) {
+        console.warn("[debug] 未设置合约地址环境变量 REACT_APP_CONTRACT_ADDRESS，无法读取 entropy fee");
+      } else {
+        const fee = await readEntropyFee({ config, contractAddress });
+        console.log("[debug] getCurrentEntropyFee (wei):", fee?.toString?.() ?? fee);
+      }
+    } catch (err) {
+      console.error("[debug] 读取 getCurrentEntropyFee 失败:", err);
+    }
+
     setStage("paying");
     setTimeout(() => {
       const prizeKey = drawPrize(inventory);
@@ -515,6 +594,19 @@ export default function App() {
           <div className="flex items-center gap-3">
             <div className="w-8 h-8"><ZetaLogoImg className="w-8 h-8 rounded" /></div>
             <div className="font-semibold">Zeta Gluck</div>
+            {isConnected && (
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                  {formatAddress(address)}
+                </span>
+                <button
+                  onClick={() => disconnect()}
+                  className="text-[11px] px-2 py-0.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-50"
+                >
+                  断开连接
+                </button>
+              </div>
+            )}
           </div>
         </header>
 
@@ -584,5 +676,13 @@ export default function App() {
 
       {/* 移动端适配：容器宽度已限制，UI 组件均为流式布局与相对尺寸 */}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <WagmiConfig config={wagmiConfig}>
+      <MainApp />
+    </WagmiConfig>
   );
 }

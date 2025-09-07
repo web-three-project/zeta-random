@@ -1,0 +1,291 @@
+// src/lib/contract.js
+
+// 依赖：wagmi/actions（v2 行为 API），viem
+import {
+  readContract,
+  writeContract,
+  waitForTransactionReceipt,
+  watchContractEvent,
+} from '@wagmi/core';
+  import { toHex } from 'viem';
+  
+  // ===== 合约 ABI（ZetaGachaStaking.sol）=====
+  export const ZetaGachaStakingAbi = [
+    // constants / views
+    { type: 'function', stateMutability: 'view', name: 'FIXED_PRIZE_POOL', inputs: [], outputs: [{ type: 'uint256' }] },
+    { type: 'function', stateMutability: 'view', name: 'prizePoolBalance', inputs: [], outputs: [{ type: 'uint256' }] },
+    { type: 'function', stateMutability: 'view', name: 'activityEnded', inputs: [], outputs: [{ type: 'bool' }] },
+    { type: 'function', stateMutability: 'view', name: 'owner', inputs: [], outputs: [{ type: 'address' }] },
+    { type: 'function', stateMutability: 'view', name: 'MAX_DRAWS_PER_ADDRESS', inputs: [], outputs: [{ type: 'uint32' }] },
+    { type: 'function', stateMutability: 'view', name: 'totalDraws', inputs: [{ type: 'address' }], outputs: [{ type: 'uint32' }] },
+  
+    // views - helpers
+    { type: 'function', stateMutability: 'view', name: 'getCurrentEntropyFee', inputs: [], outputs: [{ type: 'uint128' }] },
+    {
+      type: 'function',
+      stateMutability: 'view',
+      name: 'getContractStatus',
+      inputs: [],
+      outputs: [
+        { type: 'uint256', name: 'contractBalance' },
+        { type: 'uint256', name: 'currentPrizePool' },
+        { type: 'uint256', name: 'fixedPrizePool' },
+        { type: 'bool',    name: 'isActivityEnded' },
+        { type: 'address', name: 'owner_' },
+        { type: 'uint128', name: 'currentEntropyFee' },
+      ],
+    },
+    {
+      type: 'function',
+      stateMutability: 'view',
+      name: 'getInventoryStatus',
+      inputs: [],
+      outputs: [
+        { type: 'uint256[]', name: 'amounts' },
+        { type: 'uint256[]', name: 'probabilities' },
+        { type: 'uint256[]', name: 'maxSupplies' },
+        { type: 'uint256[]', name: 'remaining' },
+        { type: 'bool[]',    name: 'unlimited' },
+      ],
+    },
+  
+    // user
+    {
+      type: 'function',
+      stateMutability: 'payable',
+      name: 'participateAndDraw',
+      inputs: [{ type: 'bytes32', name: 'userRandomNumber' }],
+      outputs: [{ type: 'uint64', name: 'sequenceNumber' }],
+    },
+  
+    // owner/admin
+    { type: 'function', stateMutability: 'payable', name: 'seedPrizePool', inputs: [], outputs: [] },
+    { type: 'function', stateMutability: 'nonpayable', name: 'endActivity', inputs: [], outputs: [] },
+    { type: 'function', stateMutability: 'nonpayable', name: 'withdrawRemainingPrizePool', inputs: [], outputs: [] },
+    { type: 'function', stateMutability: 'nonpayable', name: 'resetInventory', inputs: [], outputs: [] },
+    { type: 'function', stateMutability: 'nonpayable', name: 'pause', inputs: [], outputs: [] },
+    { type: 'function', stateMutability: 'nonpayable', name: 'unpause', inputs: [], outputs: [] },
+  
+    // events
+    {
+      type: 'event',
+      name: 'DrawRequested',
+      inputs: [
+        { indexed: true, name: 'player', type: 'address' },
+        { indexed: true, name: 'sequenceNumber', type: 'uint64' },
+        { indexed: false, name: 'entropyFee', type: 'uint128' },
+      ],
+      anonymous: false,
+    },
+    {
+      type: 'event',
+      name: 'DrawCompleted',
+      inputs: [
+        { indexed: true, name: 'player', type: 'address' },
+        { indexed: false, name: 'tierIndex', type: 'uint8' },
+        { indexed: false, name: 'amount', type: 'uint256' },
+      ],
+      anonymous: false,
+    },
+    { type: 'event', name: 'PrizePoolSeeded', inputs: [{ indexed: false, name: 'amount', type: 'uint256' }, { indexed: false, name: 'newBalance', type: 'uint256' }], anonymous: false },
+    { type: 'event', name: 'ActivityEnded', inputs: [], anonymous: false },
+    { type: 'event', name: 'InventoryReset', inputs: [], anonymous: false },
+  ];
+  
+  // ===== 工具：前端生成 bytes32 随机数 =====
+  export function randomBytes32() {
+    // 浏览器环境生成 32 字节随机数
+    const arr = new Uint8Array(32);
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      crypto.getRandomValues(arr);
+    } else {
+      // 兜底：较弱的随机（仅在极端环境下）
+      for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 256);
+    }
+    return toHex(arr); // '0x' + 64 hex chars
+  }
+  
+  // ===== 读方法 =====
+  export async function readEntropyFee({ config, contractAddress }) {
+    return readContract(config, {
+      address: contractAddress,
+      abi: ZetaGachaStakingAbi,
+      functionName: 'getCurrentEntropyFee',
+    });
+  }
+  
+  export async function getContractStatus({ config, contractAddress }) {
+    return readContract(config, {
+      address: contractAddress,
+      abi: ZetaGachaStakingAbi,
+      functionName: 'getContractStatus',
+    });
+  }
+  
+  export async function getInventoryStatus({ config, contractAddress }) {
+    return readContract(config, {
+      address: contractAddress,
+      abi: ZetaGachaStakingAbi,
+      functionName: 'getInventoryStatus',
+    });
+  }
+  
+  export async function getUserDrawCount({ config, contractAddress, userAddress }) {
+    return readContract(config, {
+      address: contractAddress,
+      abi: ZetaGachaStakingAbi,
+      functionName: 'totalDraws',
+      args: [userAddress],
+    });
+  }
+  
+  export async function getMaxDrawsPerUser({ config, contractAddress }) {
+    return readContract(config, {
+      address: contractAddress,
+      abi: ZetaGachaStakingAbi,
+      functionName: 'MAX_DRAWS_PER_ADDRESS',
+    });
+  }
+  
+  export async function getPrizePoolBalance({ config, contractAddress }) {
+    return readContract(config, {
+      address: contractAddress,
+      abi: ZetaGachaStakingAbi,
+      functionName: 'prizePoolBalance',
+    });
+  }
+  
+  export async function getActivityEnded({ config, contractAddress }) {
+    return readContract(config, {
+      address: contractAddress,
+      abi: ZetaGachaStakingAbi,
+      functionName: 'activityEnded',
+    });
+  }
+  
+  // ===== 写方法 =====
+  // 参与抽奖：会先读取 entropy fee，若未显式传递 value 则自动用该费用
+  export async function participateAndDraw({
+    config,
+    contractAddress,
+    userRandomNumber, // bytes32
+    value,            // 可选：以 wei 指定。若不传将自动读取 entropy fee 作为 msg.value
+  }) {
+    const fee = value ?? await readEntropyFee({ config, contractAddress });
+    const hash = await writeContract(config, {
+      address: contractAddress,
+      abi: ZetaGachaStakingAbi,
+      functionName: 'participateAndDraw',
+      args: [userRandomNumber],
+      value: fee,
+    });
+    const receipt = await waitForTransactionReceipt(config, { hash });
+    return receipt;
+  }
+  
+  // 管理员：注资奖池（注意：需要严格等于 FIXED_PRIZE_POOL）
+  export async function adminSeedPrizePool({
+    config,
+    contractAddress,
+    value, // 必须等于 FIXED_PRIZE_POOL（主网：5000 ether；测试版可能缩放，请以合约为准）
+  }) {
+    const hash = await writeContract(config, {
+      address: contractAddress,
+      abi: ZetaGachaStakingAbi,
+      functionName: 'seedPrizePool',
+      value,
+    });
+    return waitForTransactionReceipt(config, { hash });
+  }
+  
+  export async function adminEndActivity({ config, contractAddress }) {
+    const hash = await writeContract(config, {
+      address: contractAddress,
+      abi: ZetaGachaStakingAbi,
+      functionName: 'endActivity',
+    });
+    return waitForTransactionReceipt(config, { hash });
+  }
+  
+  export async function adminWithdrawRemaining({ config, contractAddress }) {
+    const hash = await writeContract(config, {
+      address: contractAddress,
+      abi: ZetaGachaStakingAbi,
+      functionName: 'withdrawRemainingPrizePool',
+    });
+    return waitForTransactionReceipt(config, { hash });
+  }
+  
+  export async function adminResetInventory({ config, contractAddress }) {
+    const hash = await writeContract(config, {
+      address: contractAddress,
+      abi: ZetaGachaStakingAbi,
+      functionName: 'resetInventory',
+    });
+    return waitForTransactionReceipt(config, { hash });
+  }
+  
+  export async function adminPause({ config, contractAddress }) {
+    const hash = await writeContract(config, {
+      address: contractAddress,
+      abi: ZetaGachaStakingAbi,
+      functionName: 'pause',
+    });
+    return waitForTransactionReceipt(config, { hash });
+  }
+  
+  export async function adminUnpause({ config, contractAddress }) {
+    const hash = await writeContract(config, {
+      address: contractAddress,
+      abi: ZetaGachaStakingAbi,
+      functionName: 'unpause',
+    });
+    return waitForTransactionReceipt(config, { hash });
+  }
+  
+  // ===== 事件监听 =====
+  // 返回 unwatch() 以停止监听
+  export function onDrawRequested({ config, contractAddress, listener }) {
+    return watchContractEvent(config, {
+      address: contractAddress,
+      abi: ZetaGachaStakingAbi,
+      eventName: 'DrawRequested',
+      onLogs: (logs) => listener?.(logs),
+    });
+  }
+  
+  export function onDrawCompleted({ config, contractAddress, listener }) {
+    return watchContractEvent(config, {
+      address: contractAddress,
+      abi: ZetaGachaStakingAbi,
+      eventName: 'DrawCompleted',
+      onLogs: (logs) => listener?.(logs),
+    });
+  }
+  
+  export function onActivityEnded({ config, contractAddress, listener }) {
+    return watchContractEvent(config, {
+      address: contractAddress,
+      abi: ZetaGachaStakingAbi,
+      eventName: 'ActivityEnded',
+      onLogs: (logs) => listener?.(logs),
+    });
+  }
+  
+  export function onPrizePoolSeeded({ config, contractAddress, listener }) {
+    return watchContractEvent(config, {
+      address: contractAddress,
+      abi: ZetaGachaStakingAbi,
+      eventName: 'PrizePoolSeeded',
+      onLogs: (logs) => listener?.(logs),
+    });
+  }
+  
+  export function onInventoryReset({ config, contractAddress, listener }) {
+    return watchContractEvent(config, {
+      address: contractAddress,
+      abi: ZetaGachaStakingAbi,
+      eventName: 'InventoryReset',
+      onLogs: (logs) => listener?.(logs),
+    });
+  }
