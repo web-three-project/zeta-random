@@ -26,11 +26,24 @@ const zetaAthens = defineChain({
   },
 });
 
+const zetaMainnet = defineChain({
+  id: 7000,
+  name: "ZetaChain Mainnet",
+  nativeCurrency: { name: "ZETA", symbol: "ZETA", decimals: 18 },
+  rpcUrls: {
+    default: { http: ["https://zetachain-evm.blockpi.network/v1/rpc/public"] },
+    public: { http: ["https://zetachain-evm.blockpi.network/v1/rpc/public"] },
+  },
+  blockExplorers: {
+    default: { name: "ZetaScan", url: "https://explorer.zetachain.com" },
+  },
+});
+
 const wagmiConfig = createConfig({
-  chains: [zetaAthens],
+  chains: [zetaMainnet],
   connectors: [injected()],
   transports: {
-    [zetaAthens.id]: http(zetaAthens.rpcUrls.default.http[0]),
+    [zetaMainnet.id]: http(zetaMainnet.rpcUrls.default.http[0]),
   },
 });
 
@@ -486,8 +499,8 @@ function MainApp() {
 
     // 确保当前网络为 ZetaChain Athens Testnet (7001)
     try {
-      if (chainId !== zetaAthens.id) {
-        await switchChainAsync({ chainId: zetaAthens.id });
+      if (chainId !== zetaMainnet.id) {
+        await switchChainAsync({ chainId: zetaMainnet.id });
       }
     } catch (e) {
       alert("请在钱包中切换到 ZetaChain Athens Testnet (chainId: 7001) 后重试。");

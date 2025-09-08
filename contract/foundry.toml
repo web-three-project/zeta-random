@@ -7,6 +7,8 @@ remappings = [
     "@pyth/=lib/pyth-sdk-solidity/",
     "@pythnetwork/entropy-sdk-solidity/=node_modules/@pythnetwork/entropy-sdk-solidity/"
 ]
+solc_version = "0.8.23"
+evm_version = "paris"
 
 [rpc_endpoints]
 zeta_testnet = "${ZETA_TESTNET_RPC}"
