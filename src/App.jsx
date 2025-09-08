@@ -185,7 +185,7 @@ const I18N = {
   zh: {
     primaryLabel: "今日手气如何？",
     headline: "立即抽卡",
-    desc: "每地址每天30次免费机会，23:59 UTC +8重置",
+    desc: "每地址活动期间30次免费机会",
     draw: "免费来一张",
     secondaryLabel: "奖品库存",
     secondaryTitle: "剩余奖品库存",
