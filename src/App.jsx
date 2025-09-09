@@ -3,6 +3,7 @@ import { WagmiConfig, createConfig, http, useAccount, useConnect, useDisconnect,
 import { injected } from "wagmi/connectors";
 import { defineChain, formatUnits } from "viem";
 import { readEntropyFee, getInventoryStatus, participateAndDraw, randomBytes32, onDrawCompleted } from "./lib/contract";
+import ZetaLogoFile from "./public/logo.jpg";
 
 /**
  * Zeta Gluck – Scratch Card（单文件 React App）
@@ -202,7 +203,7 @@ const I18N = {
     receiptPaid: "· 状态：等待签名",
     receiptTime: () => `· 时间：${new Date().toLocaleString()}`,
     receiptPrinting: "· 正在出票…",
-    merchLabel: "ZETA 限量周边 * 10",
+    merchLabel: "限量周边 * 10",
   },
   en: {
     primaryLabel: "How's your luck today?",
@@ -239,10 +240,11 @@ const ZetaLogo = (props) => (
 function ZetaLogoImg({ className }) {
   const [ok, setOk] = useState(true);
   // 通过 window.ZETA_LOGO_URL 注入自定义 LOGO 地址（可为 data: URL）
-  const src = typeof window !== 'undefined' ? (window).ZETA_LOGO_URL : undefined;
+  const winSrc = typeof window !== 'undefined' ? window.ZETA_LOGO_URL : undefined;
+  const src = winSrc || ZetaLogoFile; // 优先使用外部提供的 URL，否则使用内置资源
   if (src && ok) {
     return <img src={src} className={className} alt="Zeta logo" onError={() => setOk(false)} />;
-    }
+  }
   return <ZetaLogo className={className} />;
 }
 
