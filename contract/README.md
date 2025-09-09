@@ -14,76 +14,133 @@ A decentralized gacha game contract for ZetaChain with Pyth Entropy integration.
 
 ### Core Functions
 
-- `seedPool(uint256 amount)` - Owner seeds prize pool (max 5000 ZETA)
-- `draw()` - Players pay 1 ZETA to participate in gacha
-- `onRandomnessReady(bytes32 requestId, uint256 randomness)` - Pyth callback
-- `withdrawUnclaimed()` - Owner withdraws remaining pool funds
+- `seedPrizePool()` - Owner injects the fixed prize pool (exactly 5000 ZETA)
+- `participateAndDraw(bytes32 userRandomNumber)` - User participates by paying the current Pyth Entropy fee
+- `entropyCallback(uint64 sequenceNumber, address provider, bytes32 randomNumber)` - Pyth Entropy callback
+- `withdrawRemainingPrizePool()` - Owner withdraws remaining pool funds after ending the activity
 
-### Prize Distribution
+## 部署与测试流程
 
-| Prize | Probability | Max Supply | Notes |
-|-------|-------------|------------|-------|
-| 0 ZETA | 50% | Unlimited | No prize |
-| 1 ZETA | 40% | Unlimited | Base prize |
-| 10 ZETA | 9.5% | 200 | Limited supply |
-| 100 ZETA | 0.4% | 10 | Limited supply |
-| 1000 ZETA | 0.1% | 2 | Limited supply |
+下列命令使用 Foundry 的 forge/cast 工具，请先在项目根目录加载环境变量（.env）：
 
-**Total Budget**: 5000 ZETA (10×200 + 100×10 + 1000×2)
-
-## Environment Setup
-
-1. Copy environment variables:
 ```bash
-cp .env.example .env
+source .env
 ```
 
-2. Configure your `.env` file:
+### 1. 部署（测试网/主网）
+
 ```bash
-# Required addresses
-ADDRESS1=0x...  # Owner address (controls contract)
-ADDRESS2=0x...  # Revenue address (receives overflow)
+# 测试网部署（使用 Zeta 测试网 RPC）
+forge script script/DeployStakingTestnet.s.sol \
+  --rpc-url $ZETA_TESTNET_RPC \
+  --broadcast
 
-# ZetaChain RPC endpoints
-ZETA_TESTNET_RPC=https://zetachain-athens-evm.blockpi.network/v1/rpc/public
-ZETA_MAINNET_RPC=https://zetachain-evm.blockpi.network/v1/rpc/public
-
-# Pyth Entropy provider
-PYTH_ENTROPY_PROVIDER=0x4374e5a8b9C22271E9EB878A2AA31DE97DF15DAF
-
-# Private keys for deployment
-PRIVATE_KEY_OWNER=0x...
-PRIVATE_KEY_DEPLOYER=0x...
+# 主网部署（使用 Zeta 主网 RPC）
+forge script script/DeployStaking.s.sol \
+  --rpc-url $ZETA_MAINNET_RPC \
+  --broadcast
 ```
 
-## Development Commands
+部署后请记录合约地址到环境变量，例如：
 
-### Build
 ```bash
-forge build
+export TESTNET_CONTRACT_ADDRESS=0x...
+export MAINNET_CONTRACT_ADDRESS=0x...
 ```
 
-### Test
+### 2. 奖池注入金额（Owner 执行）
+
+合约 `seedPrizePool()` 需要一次性注入固定奖池 `FIXED_PRIZE_POOL = 5000 ether`。
+
 ```bash
-forge test -vvv
+# 测试网
+cast send $TESTNET_CONTRACT_ADDRESS "seedPrizePool()" \
+  --value 5000ether \
+  --rpc-url $ZETA_TESTNET_RPC \
+  --private-key $PRIVATE_KEY_OWNER
+
+# 主网
+cast send $MAINNET_CONTRACT_ADDRESS "seedPrizePool()" \
+  --value 5000ether \
+  --rpc-url $ZETA_MAINNET_RPC \
+  --private-key $PRIVATE_KEY_OWNER
 ```
 
-### Deploy to ZetaChain Testnet
+### 3. 用户参与活动（payable 需支付 Pyth 费用）
+
+`participateAndDraw(bytes32 userRandomNumber)` 需要随交易支付当前的 Pyth Entropy 费用，不能自定义金额。
+
+先查询当前费用：
+
 ```bash
-forge script script/Deploy.s.sol --rpc-url $ZETA_TESTNET_RPC --broadcast --verify
+# 查询当前 Entropy 费用（测试网）
+cast call $TESTNET_CONTRACT_ADDRESS "getCurrentEntropyFee()(uint128)" \
+  --rpc-url $ZETA_TESTNET_RPC
+
+# 查询当前 Entropy 费用（主网）
+cast call $MAINNET_CONTRACT_ADDRESS "getCurrentEntropyFee()(uint128)" \
+  --rpc-url $ZETA_MAINNET_RPC
 ```
 
-### Interact with Contract
+将上面返回的费用数值作为 `--value` 参与抽奖：
+
 ```bash
-# Seed pool
-forge script script/Interact.s.sol:InteractScript --sig "seedPool()" --rpc-url $ZETA_TESTNET_RPC --broadcast
+# 测试网示例（bytes32 用户随机数可自定义）
+cast send $TESTNET_CONTRACT_ADDRESS \
+  "participateAndDraw(bytes32)" \
+  0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef \
+  --value $(cast call $TESTNET_CONTRACT_ADDRESS "getCurrentEntropyFee()(uint128)" --rpc-url $ZETA_TESTNET_RPC) \
+  --private-key $PRIVATE_KEY_USER \
+  --rpc-url $ZETA_TESTNET_RPC
 
-# Check status
-forge script script/Interact.s.sol:InteractScript --sig "checkStatus()" --rpc-url $ZETA_TESTNET_RPC
-
-# Test draw
-forge script script/Interact.s.sol:InteractScript --sig "testDraw()" --rpc-url $ZETA_TESTNET_RPC --broadcast
+# 主网示例
+cast send $MAINNET_CONTRACT_ADDRESS \
+  "participateAndDraw(bytes32)" \
+  0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef \
+  --value $(cast call $MAINNET_CONTRACT_ADDRESS "getCurrentEntropyFee()(uint128)" --rpc-url $ZETA_MAINNET_RPC) \
+  --private-key $PRIVATE_KEY_USER \
+  --rpc-url $ZETA_MAINNET_RPC
 ```
+
+### 4. 结束活动并提取剩余奖池（Owner 执行）
+
+```bash
+# 结束活动
+cast send $TESTNET_CONTRACT_ADDRESS \
+  "endActivity()" \
+  --private-key $PRIVATE_KEY_OWNER \
+  --rpc-url $ZETA_TESTNET_RPC
+
+# 提取剩余奖池到 Owner
+cast send $TESTNET_CONTRACT_ADDRESS \
+  "withdrawRemainingPrizePool()" \
+  --private-key $PRIVATE_KEY_OWNER \
+  --rpc-url $ZETA_TESTNET_RPC
+```
+
+主网同理，将地址与 RPC 替换为 `$MAINNET_CONTRACT_ADDRESS` 与 `$ZETA_MAINNET_RPC`。
+
+### 5. 查询命令
+
+```bash
+# 查询奖池余额（合约内部记录）
+cast call $TESTNET_CONTRACT_ADDRESS "prizePoolBalance()" --rpc-url $ZETA_TESTNET_RPC
+
+# 查询合约状态（返回：contractBalance, currentPrizePool, fixedPrizePool, isActivityEnded, owner, currentEntropyFee）
+cast call $TESTNET_CONTRACT_ADDRESS \
+  "getContractStatus()(uint256,uint256,uint256,bool,address,uint128)" \
+  --rpc-url $ZETA_TESTNET_RPC
+
+# 查询合约原生代币余额
+cast balance $TESTNET_CONTRACT_ADDRESS --rpc-url $ZETA_TESTNET_RPC --ether
+
+# Pyth 需要支付的费用（同第 3 步）
+cast call $TESTNET_CONTRACT_ADDRESS \
+  "getCurrentEntropyFee()(uint128)" \
+  --rpc-url $ZETA_TESTNET_RPC
+```
+
+如需主网查询，将地址与 RPC 切换为 `$MAINNET_CONTRACT_ADDRESS` 与 `$ZETA_MAINNET_RPC`。
 
 ## Security Features
 
@@ -109,62 +166,4 @@ forge script script/Interact.s.sol:InteractScript --sig "testDraw()" --rpc-url $
 - `RevenueTransferred(uint256 amount)`
 
 
-# 使用方法
-1.初始化奖池
-# 使用PRIVATE_KEY_OWNER为合约充值奖池
-# 测试网版本
-cast send $TESTNET_CONTRACT_ADDRESS "seedPrizePool()" \
-    --value 0.5ether \
-    --private-key $PRIVATE_KEY_OWNER \
-    --rpc-url $ZETA_TESTNET_RPC
 
-# 主网版本  
-cast send $STAKING_CONTRACT_ADDRESS "seedPrizePool()" \
-    --value 5000ether \
-    --private-key $PRIVATE_KEY_OWNER \
-    --rpc-url $ZETA_TESTNET_RPC
-
-2.用户参与抽奖
-# 使用PRIVATE_KEY_USER进行测试
-# 测试网版本
-cast send $TESTNET_CONTRACT_ADDRESS "participateAndDraw()" \
-    --value 0.0001ether \
-    --private-key $PRIVATE_KEY_USER \
-    --rpc-url $ZETA_TESTNET_RPC
-
-# 主网版本
-cast send $STAKING_CONTRACT_ADDRESS "participateAndDraw()" \
-    --value 1ether \
-    --private-key $PRIVATE_KEY_USER \
-    --rpc-url $ZETA_TESTNET_RPC
-
-3.合约状态查询
-# 查询奖池余额
-cast call $CONTRACT_ADDRESS "prizePoolBalance()" --rpc-url $ZETA_TESTNET_RPC
-
-# 查询用户质押
-cast call $CONTRACT_ADDRESS "participantStakes(address)" $USER_ADDRESS --rpc-url $ZETA_TESTNET_RPC
-
-# 查询总质押收集
-cast call $CONTRACT_ADDRESS "totalStakesCollected()" --rpc-url $ZETA_TESTNET_RPC
-
-# 查询StakeCollector余额
-cast call $STAKE_COLLECTION_ADDRESS "getBalance()" --rpc-url $ZETA_TESTNET_RPC
-
-4.结束活动
-# 使用PRIVATE_KEY_OWNER结束活动
-cast send $CONTRACT_ADDRESS "endActivity()" \
-    --private-key $PRIVATE_KEY_OWNER \
-    --rpc-url $ZETA_TESTNET_RPC
-
-# 提取剩余奖池
-cast send $CONTRACT_ADDRESS "withdrawRemainingPrizePool()" \
-    --private-key $PRIVATE_KEY_OWNER \
-    --rpc-url $ZETA_TESTNET_RPC
-
-5.转移质押资金
-
-# 使用PRIVATE_KEY_OWNER从StakeCollector转移资金到最终接收地址
-cast send $STAKE_COLLECTION_ADDRESS "emergencyWithdraw(address)" $FINAL_RECIPIENT_ADDRESS \
-    --private-key $PRIVATE_KEY_OWNER \
-    --rpc-url $ZETA_TESTNET_RPC
