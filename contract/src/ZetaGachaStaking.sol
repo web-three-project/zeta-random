@@ -106,12 +106,11 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
 
     function withdrawRemainingPrizePool() external onlyOwner {
         if (!activityEnded) revert ActivityNotEnded();
-        uint256 remaining = address(this).balance; // 取合约真实余额
-        if (remaining > 0) {
-            prizePoolBalance = 0; // 可选：清零逻辑余额
-            (bool success, ) = owner().call{value: remaining}("");
-            require(success, "Prize pool withdrawal failed");
-        }
+        uint256 remaining = address(this).balance; 
+        (bool success, ) = owner().call{value: remaining}("");
+        require(success, "Prize pool withdrawal failed");
+
+        prizePoolBalance = 0; // 可选：清零逻辑余额
     }
 
     function resetInventory() external onlyOwner {
