@@ -73,6 +73,8 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
 
     // ---------------- Constructor ----------------
     constructor(address _entropy, address _entropyProvider) Ownable(msg.sender) {
+        require(_entropy != address(0), "Invalid entropy address");
+        require(_entropyProvider != address(0), "Invalid entropy provider");
         entropy = IEntropy(_entropy);
         entropyProvider = _entropyProvider;
 
@@ -137,6 +139,8 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
         whenNotPaused
         returns (uint64 sequenceNumber)
     {
+        require(userRandomNumber != bytes32(0), "Invalid random number");
+        
         if (activityEnded) revert ActivityAlreadyEnded();
         if (totalDraws[msg.sender] >= MAX_DRAWS_PER_ADDRESS) revert DrawLimitReached();
 
@@ -149,7 +153,7 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
         );
 
 
-        unchecked { totalDraws[msg.sender] += 1; }
+        totalDraws[msg.sender] += 1;
         pendingDraws[sequenceNumber] = msg.sender;
 
         emit DrawRequested(msg.sender, sequenceNumber, entropyFee);
@@ -231,7 +235,9 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
                 return i;
             }
             if (i == 0) break;
-            unchecked { i -= 1; }
+            if (i > 0) {
+                 i -= 1;
+            }
         }
         return T_NONE;
     }
