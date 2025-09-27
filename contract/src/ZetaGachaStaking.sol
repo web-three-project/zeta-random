@@ -13,11 +13,11 @@ import "@pythnetwork/entropy-sdk-solidity/IEntropyConsumer.sol";
  * @title ZetaGachaStaking
  * @dev Free gacha (抽奖) 合约，使用 Pyth Entropy 作为安全随机源。
  * 用户仅支付 gas 和 entropy fee，不需要 stake/参与费。
- * 固定奖池 5000 ZETA（需要 Owner 一次性注入）。
+ * 固定奖池 8000 ZETA（需要 Owner 一次性注入）。
  */
 contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsumer {
     // ---------------- Constants ----------------
-    uint256 public constant FIXED_PRIZE_POOL = 5000 ether; // 固定奖池
+    uint256 public constant FIXED_PRIZE_POOL = 8000 ether; // 固定奖池（更新为 8000 ZETA）
     uint256 private constant PROB_DENOMINATOR = 1_000_000; // 百万分比 (ppm)
 
     // ---------------- Prize Tier 定义 ----------------
@@ -30,16 +30,17 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
     }
 
     // 奖励层级索引
-    uint8 public constant T_NONE         = 0;
-    uint8 public constant T_MERCH        = 1;  // 实物奖品（0 ZETA）
-    uint8 public constant T_ZEROPOINTFIVE = 2;  // 0.5 ZETA
-    uint8 public constant T_ONE          = 3;  // 1 ZETA
-    uint8 public constant T_TEN          = 4;  // 10 ZETA
-    uint8 public constant T_HUNDRED      = 5;  // 100 ZETA
-    uint8 public constant T_TWOHUNDRED   = 6;  // 200 ZETA (降级用)
-    uint8 public constant T_FIVEHUNDRED  = 7;  // 500 ZETA (降级用)
-    uint8 public constant T_THOUSAND     = 8;  // 1000 ZETA
-    uint8 public constant TIER_COUNT     = 9;
+    uint8 public constant T_NONE          = 0;  // 未中奖（作为兜底，概率为剩余）
+    uint8 public constant T_0P1           = 1;  // 0.1 ZETA
+    uint8 public constant T_0P5           = 2;  // 0.5 ZETA
+    uint8 public constant T_1             = 3;  // 1 ZETA
+    uint8 public constant T_2             = 4;  // 2 ZETA
+    uint8 public constant T_5             = 5;  // 5 ZETA
+    uint8 public constant T_10            = 6;  // 10 ZETA
+    uint8 public constant T_20            = 7;  // 20 ZETA
+    uint8 public constant T_50            = 8;  // 50 ZETA
+    uint8 public constant T_100           = 9;  // 100 ZETA
+    uint8 public constant TIER_COUNT      = 10;
 
     // ---------------- State ----------------
     uint256 public prizePoolBalance;      // 当前奖池余额
@@ -78,16 +79,23 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
         entropy = IEntropy(_entropy);
         entropyProvider = _entropyProvider;
 
-        // 初始化奖励层级
-        prizeTiers[T_NONE] = PrizeTier(0, 444_450, 0, 0, true);
-        prizeTiers[T_MERCH] = PrizeTier(0, 0, 10, 10, false);
-        prizeTiers[T_ZEROPOINTFIVE] = PrizeTier(0.5 ether, 500_000, 2000, 2000, false);        
-        prizeTiers[T_ONE] = PrizeTier(1 ether, 50_000, 1000, 1000, false);
-        prizeTiers[T_TEN] = PrizeTier(10 ether, 5_000, 100, 100, false);
-        prizeTiers[T_HUNDRED] = PrizeTier(100 ether, 500, 10, 10, false);
-        prizeTiers[T_TWOHUNDRED] = PrizeTier(200 ether, 0, 5, 5, false);
-        prizeTiers[T_FIVEHUNDRED] = PrizeTier(500 ether, 0, 2, 2, false);
-        prizeTiers[T_THOUSAND] = PrizeTier(1000 ether, 50, 1, 1, false);
+        // 初始化奖励层级（新分布）
+        // 概率单位为 ppm（每百万分），合计 1,000,000。
+        // 100 ZETA 的给定概率 0.000005% 小于 1 ppm 的精度，采用最小 1 ppm 近似（0.0001%）。
+        // 其余概率按给定值设置，未分配的概率作为未中奖（T_NONE）。
+        // 概率求和（不含 T_NONE）：350000 + 150000 + 50000 + 20000 + 10000 + 5000 + 500 + 50 + 1 = 585,551
+        // T_NONE 概率 = 1,000,000 - 585,551 = 414,449 ppm（约 41.4449%）
+        prizeTiers[T_NONE] = PrizeTier(0, 414_449, 0, 0, true);
+
+        prizeTiers[T_0P1]  = PrizeTier(0.1 ether, 350_000, 5000, 5000, false);   // 35%  N=5000
+        prizeTiers[T_0P5]  = PrizeTier(0.5 ether, 150_000, 1000, 1000, false);   // 15%  N=1000
+        prizeTiers[T_1]    = PrizeTier(1 ether,   50_000,  500,  500,  false);   // 5%   N=500
+        prizeTiers[T_2]    = PrizeTier(2 ether,   20_000,  500,  500,  false);   // 2%   N=500
+        prizeTiers[T_5]    = PrizeTier(5 ether,   10_000,  200,  200,  false);   // 1%   N=200
+        prizeTiers[T_10]   = PrizeTier(10 ether,   5_000,  150,  150,  false);   // 0.5% N=150
+        prizeTiers[T_20]   = PrizeTier(20 ether,     500,   50,   50,  false);   // 0.05% N=50
+        prizeTiers[T_50]   = PrizeTier(50 ether,      50,   20,   20,  false);   // 0.005% N=20
+        prizeTiers[T_100]  = PrizeTier(100 ether,      1,   10,   10,  false);   // ~0.0001% N=10（精度近似）
     }
 
     // ---------------- Owner Functions ----------------
