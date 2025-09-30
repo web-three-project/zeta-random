@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
-import "forge-std/console.sol"; // Add this line
+import "forge-std/console.sol";
 import "../src/ManageLotteryCode.sol";
 
 contract ManageLotteryCodeLocalTest is Test {
@@ -17,7 +17,7 @@ contract ManageLotteryCodeLocalTest is Test {
         bytes memory chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         bytes memory code = new bytes(8);
         for (uint i = 0; i < 8; i++) {
-            code[i] = chars[(seed >> (i*4)) % chars.length];
+            code[i] = chars[(seed >> (i * 4)) % chars.length];
         }
         return string(code);
     }
@@ -37,10 +37,14 @@ contract ManageLotteryCodeLocalTest is Test {
         for (uint i = 0; i < batchSize; i++) {
             string memory codeStr = randomCode(i);
             codeHashes[i] = keccak256(abi.encodePacked(codeStr));
+
+            console.log("Generated code:", codeStr);
+            console.logBytes32(codeHashes[i]);
         }
 
         manage.batchAddCode(codeHashes);
         uint total = manage.totalCodes();
+        console.log("Total codes stored:", total);
         assertEq(total, batchSize);
 
         vm.stopPrank();
@@ -52,8 +56,9 @@ contract ManageLotteryCodeLocalTest is Test {
 
         (bytes32[] memory codesPage, address[] memory usersPage) = manage.getCodesByPage(0, 5);
 
+        console.log("---- First Page of Codes ----");
         for (uint i = 0; i < codesPage.length; i++) {
-            console.log("Code hash:", uint256(codesPage[i]));
+            console.logBytes32(codesPage[i]);
             console.log("Used by:", usersPage[i]);
         }
 

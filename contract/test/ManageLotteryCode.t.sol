@@ -5,10 +5,10 @@ import "forge-std/Test.sol";
 import "../src/ManageLotteryCode.sol";
 
 contract ManageLotteryCodeTest is Test {
-    ManageLotteryCode manage;
+    ManageLotteryCode public manage;
     address owner = address(0xABCD);
+    address gacha = address(0x1234);
     address user1 = address(0x1111);
-    address user2 = address(0x2222);
 
     function setUp() public {
         vm.startPrank(owner);
@@ -16,72 +16,73 @@ contract ManageLotteryCodeTest is Test {
         vm.stopPrank();
     }
 
-    function testBatchAddCode() public {
+    function testBatchAddCodesAndQuery() public {
         vm.startPrank(owner);
 
-        bytes32 code1 = keccak256(abi.encodePacked("CODE1"));
-        bytes32 code2 = keccak256(abi.encodePacked("CODE2"));
+        // 生成两条邀请码的 hash
+        bytes32 code1 = keccak256(abi.encodePacked("INVITE1234"));
+        bytes32 code2 = keccak256(abi.encodePacked("INVITE5678"));
 
-        // ✅ 修正后: 声明并初始化一个动态数组
         bytes32[] memory codes = new bytes32[](2);
         codes[0] = code1;
         codes[1] = code2;
 
+        // 批量添加
         manage.batchAddCode(codes);
-        uint total = manage.totalCodes();
-        assertEq(total, 2);
+
+        assertEq(manage.totalCodes(), 2);
+        assertTrue(manage.codeExists(code1));
+        assertTrue(manage.codeExists(code2));
+
+        // 分页查询
+        (bytes32[] memory pageCodes, address[] memory users) = manage.getCodesByPage(0, 2);
+        assertEq(pageCodes.length, 2);
+        assertEq(users[0], address(0));
+        assertEq(users[1], address(0));
 
         vm.stopPrank();
     }
 
-    function testSetUsedBy() public {
+    function testSetUsedByFromGacha() public {
+        // 先添加一个邀请码
         vm.startPrank(owner);
+        bytes32 code = keccak256(abi.encodePacked("INVITE9999"));
+        bytes32[] memory codes = new bytes32[](1);
+        codes[0] = code;
+        manage.batchAddCode(codes);
 
-        bytes32 code1 = keccak256(abi.encodePacked("CODE1"));
-        manage.batchAddCode(toArray(code1));
-
-        manage.setUsedBy(code1, user1);
-        address used = manage.usedBy(code1);
-        assertEq(used, user1);
-
+        // 设置 Gacha 合约
+        manage.setGachaContract(gacha);
         vm.stopPrank();
+
+        // 用 gacha 合约来调用 setUsedBy
+        vm.startPrank(gacha);
+        manage.setUsedBy(code, user1);
+        vm.stopPrank();
+
+        // 校验
+        assertEq(manage.usedBy(code), user1);
     }
 
-    function testCannotReuseCode() public {
+    function test_RevertWhen_CodeIsDoubleUsed() public {
+    // 添加邀请码
         vm.startPrank(owner);
+        bytes32 code = keccak256(abi.encodePacked("INVITE0000"));
+        bytes32[] memory codes = new bytes32[](1);
+        codes[0] = code;
+        manage.batchAddCode(codes);
 
-        bytes32 code1 = keccak256(abi.encodePacked("CODE1"));
-        manage.batchAddCode(toArray(code1));
+        manage.setGachaContract(gacha);
+        vm.stopPrank();
 
-        manage.setUsedBy(code1, user1);
+    // 第一次使用
+        vm.prank(gacha);
+        manage.setUsedBy(code, user1);
 
+    // 第二次使用应该 revert
+        vm.startPrank(gacha);
         vm.expectRevert("Already used");
-        manage.setUsedBy(code1, user2);
-
+        manage.setUsedBy(code, address(0x2222));
         vm.stopPrank();
-    }
-
-    function testPagination() public {
-        vm.startPrank(owner);
-
-        // ✅ 修正后: 声明并初始化一个动态数组
-        bytes32[] memory codes = new bytes32[](5);
-        for (uint i = 0; i < 5; i++) {
-            codes[i] = keccak256(abi.encodePacked("CODE", i));
-        }
-
-        manage.batchAddCode(codes);
-
-        (bytes32[] memory pageCodes, address[] memory pageUsers) = manage.getCodesByPage(1, 3);
-        assertEq(pageCodes.length, 3);
-        assertEq(pageUsers.length, 3);
-
-        vm.stopPrank();
-    }
-
-    function toArray(bytes32 code) internal pure returns (bytes32[] memory arr) {
-        // ✅ 修正后: 声明并初始化一个长度为 1 的动态数组
-        arr = new bytes32[](1);
-        arr[0] = code;
     }
 }
