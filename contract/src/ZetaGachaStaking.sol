@@ -24,7 +24,7 @@ interface IManageLotteryCode {
  */
 contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsumer {
     // ---------------- Constants ----------------
-    uint256 public constant FIXED_PRIZE_POOL = 0.5 ether;
+    uint256 public constant FIXED_PRIZE_POOL = 2 ether;
     uint256 private constant PROB_DENOMINATOR = 1_000_000; // ppm
 
     // ---------------- Prize Tier ----------------

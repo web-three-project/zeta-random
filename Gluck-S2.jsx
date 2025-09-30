@@ -1,28 +1,22 @@
 import React, { useEffect, useRef, useState } from "react";
 
-/**
- * Zeta Gluck – Scratch Card（单文件 React App）
- *
- * 修复：
- * - 解决 GiftCard JSX 结构中多余 </div> 导致的 “Adjacent JSX elements…” 报错。
- * - 保持你已要求的改动：无语言切换、百分比无“剩余”、网格按 0.2→1→10→100→1000→周边 排序、刮奖卡片“来自”无 logo。
- */
+// Zeta Gluck – React JSX module (converted from Gluck2.HTML)
+// Usage: import App from './Gluck2'; then render <App /> in your React app.
+// Note: Tailwind must be configured in your build (no CDN). Remove/adjust classes if not using Tailwind.
 
-// ---- 工具：本地持久化 ----
-const LS_KEY = "zeta_scratch_inventory_v4"; // 升级版本以便切换到新奖池（0.2 档）
+// ---- Local storage helpers ----
+const LS_KEY = "zeta_scratch_inventory_v4";
 const LS_FIRST_VISIT = "zeta_first_visit_done_v1";
 
 const DEFAULT_INVENTORY = {
-  // 展示用（六档，包含 0.2）
-  zeropointtwo: { max: 5000, left: 5000, value: 0.2 }, // 0.2 ZETA * 5000
-  one: { max: 1000, left: 1000, value: 1 }, // 默认装满
+  zeropointtwo: { max: 5000, left: 5000, value: 0.2 },
+  one: { max: 1000, left: 1000, value: 1 },
   ten: { max: 100, left: 100, value: 10 },
   hundred: { max: 10, left: 10, value: 100 },
-  twohundred: { max: 5, left: 5, value: 200 }, // 保留（不在网格）
-  fivehundred: { max: 2, left: 2, value: 500 }, // 保留（不在网格）
-  // 仅抽奖用（也在网格展示）
-  thousand: { max: 1, left: 1, value: 1000 },           // 1000 ZETA * 1
-  merch: { max: 10, left: 10, value: 0, label: "ZETA特别周边" }, // 周边 * 10
+  twohundred: { max: 5, left: 5, value: 200 },
+  fivehundred: { max: 2, left: 2, value: 500 },
+  thousand: { max: 1, left: 1, value: 1000 },
+  merch: { max: 10, left: 10, value: 0, label: "ZETA特别周边" },
 };
 
 function loadInventory() {
@@ -30,7 +24,6 @@ function loadInventory() {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return { ...DEFAULT_INVENTORY };
     const parsed = JSON.parse(raw);
-    // 合并默认结构，兼容旧字段
     return {
       zeropointtwo: { ...DEFAULT_INVENTORY.zeropointtwo, ...(parsed.zeropointtwo || {}) },
       one: { ...DEFAULT_INVENTORY.one, ...(parsed.one || {}) },
@@ -50,29 +43,17 @@ function saveInventory(inv) {
   localStorage.setItem(LS_KEY, JSON.stringify(inv));
 }
 
-// ---- 抽奖逻辑 ----
-/**
- * 概率模型（相对权重）：
- * 0.2 ZETA: 50%
- * 1 ZETA:   5%
- * 10 ZETA:  0.5%
- * 100 ZETA: 0.05%
- * 1000 ZETA:0.005%
- * 未中奖：  44.445%
- *
- * 说明：有限库存 prize 用对应权重；若抽到某档但售罄，则按高→低顺序降级。
- */
+// ---- Weights / drawing ----
 const BASE_WEIGHTS = [
   { key: "thousand", weight: 0.005, unlimited: false, value: 1000 },
-  { key: "hundred",  weight: 0.05,  unlimited: false, value: 100 },
-  { key: "ten",      weight: 0.5,   unlimited: false, value: 10 },
-  { key: "one",      weight: 5,     unlimited: false, value: 1 },
+  { key: "hundred", weight: 0.05, unlimited: false, value: 100 },
+  { key: "ten", weight: 0.5, unlimited: false, value: 10 },
+  { key: "one", weight: 5, unlimited: false, value: 1 },
   { key: "zeropointtwo", weight: 50, unlimited: false, value: 0.2 },
-  { key: "none",     weight: 44.445, unlimited: true, value: 0 },
-  // 保留键（本分布不赋权重）
+  { key: "none", weight: 44.445, unlimited: true, value: 0 },
   { key: "fivehundred", weight: 0, unlimited: false, value: 500 },
-  { key: "twohundred",  weight: 0, unlimited: false, value: 200 },
-  { key: "merch",       weight: 0, unlimited: false, value: 0 },
+  { key: "twohundred", weight: 0, unlimited: false, value: 200 },
+  { key: "merch", weight: 0, unlimited: false, value: 0 },
 ];
 
 function weightedPick(weights) {
@@ -83,27 +64,16 @@ function weightedPick(weights) {
     acc += w.weight;
     if (r <= acc) return w.key;
   }
-  return weights[weights.length - 1].key; // fallback → 最后一项
+  return weights[weights.length - 1].key;
 }
 
 function demotePrize(key, inv) {
-  // 从高到低降级链
-  const chain = [
-    "thousand",
-    "fivehundred",
-    "twohundred",
-    "hundred",
-    "ten",
-    "one",
-    "zeropointtwo",
-    "merch",
-    "none",
-  ];
+  const chain = ["thousand", "fivehundred", "twohundred", "hundred", "ten", "one", "zeropointtwo", "merch", "none"];
   let idx = chain.indexOf(key);
   if (idx === -1) return "none";
   while (idx < chain.length) {
     const k = chain[idx];
-    if (k === "none") return k; // 未中奖无限
+    if (k === "none") return k;
     if (inv[k] && inv[k].left > 0) return k;
     idx++;
   }
@@ -111,30 +81,18 @@ function demotePrize(key, inv) {
 }
 
 function drawPrize(inv) {
-  // 有货的 prize 使用权重；售罄则权重为 0
   const dynamicWeights = BASE_WEIGHTS.map((w) => {
     if (w.unlimited) return w;
     const has = inv[w.key]?.left > 0;
     return has ? w : { ...w, weight: 0 };
   }).filter((w) => w.weight > 0 || w.unlimited);
-
   const picked = weightedPick(dynamicWeights);
-  const actual = demotePrize(picked, inv);
-  return actual;
+  return demotePrize(picked, inv);
 }
 
 function consumeInventory(inv, key) {
   const copy = JSON.parse(JSON.stringify(inv));
-  if ([
-    "zeropointtwo",
-    "one",
-    "ten",
-    "hundred",
-    "twohundred",
-    "fivehundred",
-    "thousand",
-    "merch",
-  ].includes(key) && copy[key].left > 0) {
+  if (["zeropointtwo", "one", "ten", "hundred", "twohundred", "fivehundred", "thousand", "merch"].includes(key) && copy[key].left > 0) {
     copy[key].left -= 1;
   }
   saveInventory(copy);
@@ -167,6 +125,7 @@ const I18N = {
     receiptPrinting: "· 正在出票…",
     merchLabel: "ZETA 限量周边 * 10",
     language: "语言",
+    shareJoy: "分享喜悦",
   },
   en: {
     primaryLabel: "How's your luck today?",
@@ -192,6 +151,7 @@ const I18N = {
     receiptPrinting: "· Printing…",
     merchLabel: "ZETA limited merch * 10",
     language: "Language",
+    shareJoy: "Share Joy",
   },
   ko: {
     primaryLabel: "오늘 운이 어떤가요?",
@@ -217,83 +177,11 @@ const I18N = {
     receiptPrinting: "· 출력 중…",
     merchLabel: "ZETA 한정 굿즈 * 10",
     language: "언어",
+    shareJoy: "기쁨 공유",
   },
 };
 
-// ---- UI：Logo（图片优先，失败回退到内置SVG） ----
-const ZetaLogo = (props) => (
-  <svg viewBox="0 0 120 120" aria-hidden className={props.className}>
-    <circle cx="60" cy="60" r="58" fill="#0c503d" />
-    <path d="M30 35h60l-40 50h40v10H30l40-50H30z" fill="white" />
-  </svg>
-);
-
-function ZetaLogoImg({ className }) {
-  const [ok, setOk] = useState(true);
-  // 通过 window.ZETA_LOGO_URL 注入自定义 LOGO 地址（可为 data: URL）
-  const src = typeof window !== 'undefined' ? (window).ZETA_LOGO_URL : undefined;
-  if (src && ok) {
-    return <img src={src} className={className} alt="Zeta logo" onError={() => setOk(false)} />;
-    }
-  return <ZetaLogo className={className} />;
-}
-
-// ---- UI：GiftCard（无图案，居中结果） ----
-function GiftCard({ prize, t, isRevealed = false }) {
-  const title = prize.label || (prize.value > 0 ? `${prize.value} ZETA` : (t.sorry.includes('谢谢') ? '谢谢参与' : 'Better luck next time'));
-  return (
-    <div className="w-full">
-      <div className={`mx-auto w-full max-w-[360px] rounded-2xl border p-4 shadow-sm transition-all duration-500 ${
-        isRevealed 
-          ? 'border-gray-300 bg-gray-100' 
-          : 'border-slate-200 bg-white'
-      }`}>
-        <div className={`flex items-center justify-center text-sm ${
-          isRevealed ? 'text-gray-500' : 'text-slate-500'
-        }`}>
-          <span>{t.giftFrom}</span>
-        </div>
-        <div className={`text-center text-2xl font-semibold mb-3 ${
-          isRevealed ? 'text-gray-600' : 'text-slate-900'
-        }`}>ZetaChain</div>
-        <div className={`text-center mb-4 ${
-          isRevealed ? 'text-gray-500' : 'text-emerald-600'
-        }`}>{t.checkWin}</div>
-
-        <div className={`rounded-xl border-2 p-4 ${
-          isRevealed 
-            ? 'border-gray-300 bg-gray-50' 
-            : 'border-slate-200 bg-white'
-        }`}>
-          <div className="mx-auto max-w-[320px]">
-            <div className={`rounded-xl border p-4 min-h-[220px] flex flex-col items-center justify-center ${
-              isRevealed 
-                ? 'border-gray-300 bg-gray-100' 
-                : 'border-slate-200 bg-white'
-            }`}>
-              <div className={`text-center text-3xl font-extrabold my-2 ${
-                isRevealed ? 'text-gray-600' : 'text-slate-900'
-              }`}>{title}</div>
-              <div className={`text-center text-sm font-medium mt-2 ${
-                isRevealed ? 'text-gray-500' : 'text-emerald-700'
-              }`}>ZetaChain</div>
-            </div>
-          </div>
-        </div>
-
-        <div className={`mt-4 rounded-xl p-3 text-center ${
-          isRevealed 
-            ? 'bg-gray-200 text-gray-600' 
-            : 'bg-emerald-50 text-emerald-700'
-        }`}>
-          {prize.value > 0 || prize.label ? t.congrats(title) : t.sorry}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---- UI：ScratchCanvas ----
+// ---- Scratch canvas ----
 function ScratchCanvas({ onReveal, t }) {
   const canvasRef = useRef(null);
   const revealRef = useRef(false);
@@ -315,16 +203,16 @@ function ScratchCanvas({ onReveal, t }) {
       paint();
     }
 
-    function noise(ctx, w, h) {
-      const img = ctx.createImageData(w, h);
+    function noise(ctx2, w, h) {
+      const img = ctx2.createImageData(w, h);
       for (let i = 0; i < img.data.length; i += 4) {
-        const n = 200 + Math.random() * 40; // 金属感
+        const n = 200 + Math.random() * 40;
         img.data[i] = n;
         img.data[i + 1] = n;
         img.data[i + 2] = n;
         img.data[i + 3] = 255;
       }
-      ctx.putImageData(img, 0, 0);
+      ctx2.putImageData(img, 0, 0);
     }
 
     function paint() {
@@ -339,7 +227,7 @@ function ScratchCanvas({ onReveal, t }) {
       ctx.font = "bold 14px system-ui, -apple-system, Segoe UI, Roboto";
       ctx.textAlign = "center";
       ctx.fillText(t.scratchHint, width / 2, height / 2);
-      ctx.globalCompositeOperation = "destination-out"; // 擦除模式
+      ctx.globalCompositeOperation = "destination-out";
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
     }
@@ -380,7 +268,6 @@ function ScratchCanvas({ onReveal, t }) {
 
     function start(e) {
       scratching = true;
-      canvas.style.cursor = 'url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTMgMTJMMTIgM0wyMSAxMkwyMSAyMUwxMiAyMUwzIDEyWiIgZmlsbD0iIzMzMzMzMyIgc3Ryb2tlPSIjNjY2NjY2IiBzdHJva2Utd2lkdGg9IjEuNSIvPgo8L3N2Zz4K"), auto';
       if (navigator.vibrate) navigator.vibrate(3);
       const { x, y } = pointerPos(e);
       lastRef.current = { x, y };
@@ -394,12 +281,11 @@ function ScratchCanvas({ onReveal, t }) {
       lastRef.current = { x, y };
       if (!revealRef.current && percentCleared() > 0.6) {
         revealRef.current = true;
-        setTimeout(() => onReveal?.(), 200);
+        setTimeout(() => onReveal && onReveal(), 200);
       }
     }
     function end() {
       scratching = false;
-      canvas.style.cursor = 'default';
       lastRef.current = null;
     }
 
@@ -422,53 +308,43 @@ function ScratchCanvas({ onReveal, t }) {
     };
   }, [onReveal, t]);
 
-  return (
-    <canvas ref={canvasRef} className="absolute inset-0 w-full h-full rounded-xl"/>
-  );
+  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full rounded-xl" />;
 }
 
-// ---- 打字机效果组件 ----
+// ---- Typing effect ----
 function TypewriterText({ texts, lang }) {
   const [currentTextIndex, setCurrentTextIndex] = useState(0);
-  const [currentText, setCurrentText] = useState('');
+  const [currentText, setCurrentText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [charIndex, setCharIndex] = useState(0);
 
   useEffect(() => {
     const currentLangTexts = texts[lang] || texts.zh;
     const currentFullText = currentLangTexts[currentTextIndex];
-    
     if (!currentFullText) return;
-    
     const timeout = setTimeout(() => {
       if (!isDeleting) {
-        // 打字
         if (charIndex < currentFullText.length) {
           setCurrentText(currentFullText.substring(0, charIndex + 1));
           setCharIndex(charIndex + 1);
         } else {
-          // 打完字后等待2秒开始删除
           setTimeout(() => setIsDeleting(true), 2000);
         }
       } else {
-        // 删除
         if (charIndex > 0) {
           setCurrentText(currentFullText.substring(0, charIndex - 1));
           setCharIndex(charIndex - 1);
         } else {
-          // 删除完后切换到下一个文本
           setIsDeleting(false);
           setCurrentTextIndex((prev) => (prev + 1) % currentLangTexts.length);
         }
       }
-    }, isDeleting ? 100 : 150); // 删除比打字快一点
-
+    }, isDeleting ? 100 : 150);
     return () => clearTimeout(timeout);
   }, [charIndex, isDeleting, texts, lang, currentTextIndex]);
 
   useEffect(() => {
-    // 当语言改变时重置
-    setCurrentText('');
+    setCurrentText("");
     setCharIndex(0);
     setIsDeleting(false);
     setCurrentTextIndex(0);
@@ -482,12 +358,12 @@ function TypewriterText({ texts, lang }) {
   );
 }
 
-// ---- 进度条组件（首次访问动画） ----
+// ---- ProgressBar ----
 function ProgressBar({ percent, animate }) {
   const [w, setW] = useState(animate ? 0 : percent);
   useEffect(() => {
     if (!animate) return;
-    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const t = setTimeout(() => setW(percent), reduce ? 0 : 20);
     return () => clearTimeout(t);
   }, [animate, percent]);
@@ -498,87 +374,59 @@ function ProgressBar({ percent, animate }) {
   );
 }
 
-// ---- UI：横幅滚动动画 ----
+// ---- BannerAnimation ----
 function BannerAnimation() {
   const [messages, setMessages] = useState([]);
-
   useEffect(() => {
     const prizes = [0.2, 1, 10];
-    
-    // 初始化一些消息
     const initialMessages = Array.from({ length: 5 }, () => {
       const address = `0x${Math.random().toString(16).substr(2, 3)}...${Math.random().toString(16).substr(2, 3)}`;
       const prize = prizes[Math.floor(Math.random() * prizes.length)];
-      return {
-        id: Date.now() + Math.random() + Math.random(),
-        text: `${address} won ${prize} ZETA`,
-      };
+      return { id: Date.now() + Math.random() + Math.random(), text: `${address} won ${prize} ZETA` };
     });
     setMessages(initialMessages);
-    
     const interval = setInterval(() => {
-      // 随机生成地址
       const address = `0x${Math.random().toString(16).substr(2, 3)}...${Math.random().toString(16).substr(2, 3)}`;
       const prize = prizes[Math.floor(Math.random() * prizes.length)];
-      
-      const newMessage = {
-        id: Date.now() + Math.random(),
-        text: `${address} won ${prize} ZETA`,
-      };
-      
-      setMessages(prev => [...prev.slice(-4), newMessage]); // keep only last 5 messages
-    }, 3000); // new message every 3 seconds
-
+      setMessages((prev) => [...prev.slice(-4), { id: Date.now() + Math.random(), text: `${address} won ${prize} ZETA` }]);
+    }, 3000);
     return () => clearInterval(interval);
   }, []);
-
   return (
     <div className="relative overflow-hidden bg-gradient-to-r from-emerald-50 to-emerald-100 border-b border-emerald-200 py-2">
       <div className="flex animate-[scroll-banner_20s_linear_infinite] whitespace-nowrap">
-        {/* 第一组消息 */}
-        {messages.map((message, index) => (
-          <div key={message.id} className="inline-flex items-center mx-12 text-sm text-emerald-700 font-medium">
+        {messages.map((m) => (
+          <div key={m.id} className="inline-flex items-center mx-12 text-sm text-emerald-700 font-medium">
             <span className="mr-2">🎉</span>
-            {message.text}
+            {m.text}
           </div>
         ))}
-        {/* 第二组消息 - 重复以形成无缝滚动 */}
-        {messages.map((message, index) => (
-          <div key={`repeat-${message.id}`} className="inline-flex items-center mx-12 text-sm text-emerald-700 font-medium">
+        {messages.map((m) => (
+          <div key={`r1-${m.id}`} className="inline-flex items-center mx-12 text-sm text-emerald-700 font-medium">
             <span className="mr-2">🎉</span>
-            {message.text}
+            {m.text}
           </div>
         ))}
-        {/* 第三组消息 - 确保连续滚动 */}
-        {messages.map((message, index) => (
-          <div key={`repeat2-${message.id}`} className="inline-flex items-center mx-12 text-sm text-emerald-700 font-medium">
+        {messages.map((m) => (
+          <div key={`r2-${m.id}`} className="inline-flex items-center mx-12 text-sm text-emerald-700 font-medium">
             <span className="mr-2">🎉</span>
-            {message.text}
+            {m.text}
           </div>
         ))}
       </div>
       <style>{`
-        @keyframes scroll-banner {
-          0% {
-            transform: translateX(100%);
-          }
-          100% {
-            transform: translateX(-100%);
-          }
-        }
+        @keyframes scroll-banner { 0% { transform: translateX(100%);} 100% { transform: translateX(-100%);} }
       `}</style>
     </div>
   );
 }
 
-// ---- UI：撒花动画 ----
+// ---- ConfettiAnimation ----
 function ConfettiAnimation({ show }) {
   const [particles, setParticles] = useState([]);
-
   useEffect(() => {
     if (!show) return;
-    
-    const colors = ['#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+    const colors = ["#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
     const newParticles = Array.from({ length: 50 }, (_, i) => ({
       id: i,
       x: Math.random() * window.innerWidth,
@@ -590,57 +438,68 @@ function ConfettiAnimation({ show }) {
       rotation: Math.random() * 360,
       rotationSpeed: (Math.random() - 0.5) * 10,
     }));
-    
     setParticles(newParticles);
-    
     const interval = setInterval(() => {
-      setParticles(prev => prev.map(p => ({
-        ...p,
-        x: p.x + p.vx,
-        y: p.y + p.vy,
-        rotation: p.rotation + p.rotationSpeed,
-        vy: p.vy + 0.1, // gravity
-      })).filter(p => p.y < window.innerHeight + 50));
+      setParticles((prev) => prev.map((p) => ({ ...p, x: p.x + p.vx, y: p.y + p.vy, rotation: p.rotation + p.rotationSpeed, vy: p.vy + 0.1 })).filter((p) => p.y < window.innerHeight + 50));
     }, 16);
-    
-    const timeout = setTimeout(() => {
-      clearInterval(interval);
-      setParticles([]);
-    }, 2000);
-    
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
-    };
+    const timeout = setTimeout(() => { clearInterval(interval); setParticles([]); }, 2000);
+    return () => { clearInterval(interval); clearTimeout(timeout); };
   }, [show]);
-
   if (!show || particles.length === 0) return null;
-
   return (
     <div className="pointer-events-none fixed inset-0 z-50">
-      {particles.map(particle => (
-        <div
-          key={particle.id}
-          className="absolute w-2 h-2 rounded-sm"
-          style={{
-            left: particle.x,
-            top: particle.y,
-            backgroundColor: particle.color,
-            transform: `rotate(${particle.rotation}deg)`,
-            width: particle.size,
-            height: particle.size,
-          }}
-        />
+      {particles.map((p) => (
+        <div key={p.id} className="absolute w-2 h-2 rounded-sm" style={{ left: p.x, top: p.y, backgroundColor: p.color, transform: `rotate(${p.rotation}deg)`, width: p.size, height: p.size }} />
       ))}
     </div>
   );
 }
 
-// ---- UI：付款（发票/小票）动画 ----
+// ---- Share image ----
+async function generateShareImage(prize) {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  canvas.width = 800; canvas.height = 1000;
+  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, "#f0fdf4"); gradient.addColorStop(1, "#ecfdf5");
+  ctx.fillStyle = gradient; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#065f46"; ctx.font = "bold 48px system-ui, -apple-system, Segoe UI, Roboto"; ctx.textAlign = "center";
+  ctx.fillText("Zeta Gluck Season 2", canvas.width / 2, 120);
+  const prizeText = prize.label || (prize.value > 0 ? `${prize.value} ZETA` : "谢谢参与");
+  ctx.fillStyle = "#047857"; ctx.font = "bold 36px system-ui, -apple-system, Segoe UI, Roboto"; ctx.fillText("🎉 恭喜获得", canvas.width / 2, 220);
+  ctx.fillStyle = "#059669"; ctx.font = "bold 42px system-ui, -apple-system, Segoe UI, Roboto"; ctx.fillText(prizeText, canvas.width / 2, 300);
+  ctx.fillStyle = "#374151"; ctx.font = "bold 28px system-ui, -apple-system, Segoe UI, Roboto"; ctx.fillText("好运就在Gluck，S2赛季等你来", canvas.width / 2, 400);
+  try {
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent('https://zeta-gluck.vercel.app/')}`;
+    const qrImg = new Image(); qrImg.crossOrigin = 'anonymous';
+    return new Promise((resolve) => {
+      qrImg.onload = () => {
+        ctx.drawImage(qrImg, canvas.width / 2 - 100, 500, 200, 200);
+        ctx.fillStyle = '#6b7280'; ctx.font = '20px system-ui, -apple-system, Segoe UI, Roboto'; ctx.fillText('扫码参与 Gluck', canvas.width / 2, 750);
+        ctx.fillStyle = '#10b981'; ctx.font = 'bold 24px system-ui, -apple-system, Segoe UI, Roboto'; ctx.fillText('ZetaChain', canvas.width / 2, 850);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      qrImg.onerror = () => {
+        ctx.fillStyle = '#065f46'; ctx.fillRect(canvas.width / 2 - 100, 500, 200, 200);
+        ctx.fillStyle = '#ffffff'; ctx.font = 'bold 16px system-ui, -apple-system, Segoe UI, Roboto';
+        ctx.fillText('QR Code', canvas.width / 2, 580); ctx.fillText('zeta-gluck.vercel.app', canvas.width / 2, 610);
+        ctx.fillStyle = '#6b7280'; ctx.font = '20px system-ui, -apple-system, Segoe UI, Roboto'; ctx.fillText('扫码参与 Gluck', canvas.width / 2, 750);
+        ctx.fillStyle = '#10b981'; ctx.font = 'bold 24px system-ui, -apple-system, Segoe UI, Roboto'; ctx.fillText('ZetaChain', canvas.width / 2, 850);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      qrImg.src = qrUrl;
+    });
+  } catch (e) {
+    console.error('生成分享图片失败:', e);
+    return canvas.toDataURL('image/png');
+  }
+}
+
+// ---- Receipt animation (simplified) ----
 function ReceiptAnimation({ show, t }) {
   return (
-    <div className={`pointer-events-none fixed inset-0 z-50 flex items-center justify-center transition ${show ? "opacity-100" : "opacity-0"}`}>
-      {show && (<div className="bg-black/30 absolute inset-0" />)}
+    <div className={`pointer-events-none fixed inset-0 z-50 flex items-center justify-center transition ${show ? 'opacity-100' : 'opacity-0'}`}>
+      {show && <div className="bg-black/30 absolute inset-0" />}
       {show && (
         <div className="relative z-10 w-[320px] max-w-[80vw]">
           <div className="overflow-hidden rounded-2xl shadow-xl bg-white">
@@ -653,24 +512,102 @@ function ReceiptAnimation({ show, t }) {
           </div>
         </div>
       )}
-      <style>{`@keyframes scroll{0%{transform:translateY(10px)}50%{transform:translateY(-10px)}100%{transform:translateY(10px)}}`}</style>
     </div>
   );
 }
 
-// ---- 主页面 ----
-export default function App() {
+// ---- Luck code modal ----
+function LuckModal({ show, onClose, onConfirm, luckCode, setLuckCode }) {
+  const [inputCode, setInputCode] = useState("");
+  const [isValidating, setIsValidating] = useState(false);
+
+  const handleSubmit = () => {
+    if (inputCode.length === 8) {
+      setIsValidating(true);
+      setTimeout(() => {
+        setLuckCode(inputCode);
+        setIsValidating(false);
+        onConfirm();
+        onClose();
+      }, 1000);
+    }
+  };
+  const generateRandomCode = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < 8; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+    setInputCode(result);
+  };
+  if (!show) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="bg-black/50 absolute inset-0" onClick={onClose} />
+      <div className="relative z-10 w-[400px] max-w-[90vw] bg-white rounded-2xl shadow-2xl overflow-hidden">
+        <div className="p-6">
+          <div className="text-center mb-6">
+            <div className="text-4xl mb-2">🍀</div>
+            <h3 className="text-xl font-bold text-slate-800 mb-2">输入来自KOL的好运符</h3>
+            <p className="text-sm text-slate-600">请输入8位随机字母或数字</p>
+          </div>
+          <div className="mb-4">
+            <input type="text" value={inputCode} onChange={(e) => setInputCode(e.target.value.toUpperCase())} placeholder="输入8位好运符" maxLength={8} className="w-full px-4 py-3 border border-slate-300 rounded-xl text-center text-lg font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500" />
+            <div className="flex justify-between items-center mt-2">
+              <span className="text-xs text-slate-500">{inputCode.length}/8 位</span>
+              <button onClick={generateRandomCode} className="text-xs text-purple-600 hover:text-purple-700 font-medium">随机生成</button>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={onClose} className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition-colors">取消</button>
+            <button onClick={handleSubmit} disabled={inputCode.length !== 8 || isValidating} className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl font-medium disabled:opacity-50">{isValidating ? '验证中...' : '确认'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- GiftCard ----
+function GiftCard({ prize, t, isRevealed = false, isLuckMode = false }) {
+  const title = prize.label || (prize.value > 0 ? `${prize.value} ZETA` : (t.sorry.includes('谢谢') ? '谢谢参与' : 'Better luck next time'));
+  return (
+    <div className="w-full">
+      <div className={`mx-auto w-full max-w-[360px] rounded-2xl border p-4 shadow-sm transition-all duration-500 ${isRevealed ? 'border-gray-300 bg-gray-100' : 'border-slate-200 bg-white'}`}>
+        <div className={`flex items-center justify-center text-sm ${isRevealed ? 'text-gray-500' : 'text-slate-500'}`}>
+          <span>{t.giftFrom}</span>
+        </div>
+        <div className={`text-center text-2xl font-semibold mb-3 ${isRevealed ? 'text-gray-600' : 'text-slate-900'}`}>ZetaChain</div>
+        <div className={`text-center mb-4 ${isRevealed ? 'text-gray-500' : (isLuckMode ? 'text-purple-600' : 'text-emerald-600')}`}>{isLuckMode ? 'Boost已使用' : t.checkWin}</div>
+        <div className={`rounded-xl border-2 p-4 ${isRevealed ? 'border-gray-300 bg-gray-50' : 'border-slate-200 bg-white'}`}>
+          <div className="mx-auto max-w-[320px]">
+            <div className={`rounded-xl border p-4 min-h-[220px] flex flex-col items-center justify-center ${isRevealed ? 'border-gray-300 bg-gray-100' : 'border-slate-200 bg-white'}`}>
+              <div className={`text-center text-3xl font-extrabold my-2 ${isRevealed ? 'text-gray-600' : 'text-slate-900'}`}>{title}</div>
+              <div className={`text-center text-sm font-medium mt-2 ${isRevealed ? 'text-gray-500' : 'text-emerald-700'}`}>ZetaChain</div>
+            </div>
+          </div>
+        </div>
+        <div className={`mt-4 rounded-xl p-3 text-center ${isRevealed ? 'bg-gray-200 text-gray-600' : 'bg-emerald-50 text-emerald-700'}`}>
+          <a href="https://x.com/ZetaChain_CH" target="_blank" rel="noopener noreferrer" className="hover:underline">关注推特 @ZetaChain_CH 好运翻倍</a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- App ----
+function App() {
   const [inventory, setInventory] = useState(loadInventory());
   const [stage, setStage] = useState("idle"); // idle → paying → scratching → revealed
   const [prize, setPrize] = useState({ key: "none", value: 0 });
-  const [lang, setLang] = useState("zh"); // 支持语言切换
+  const [lang, setLang] = useState("zh");
   const [firstVisit, setFirstVisit] = useState(() => !localStorage.getItem(LS_FIRST_VISIT));
   const [showConfetti, setShowConfetti] = useState(false);
+  const [isGeneratingShare, setIsGeneratingShare] = useState(false);
+  const [isLuckMode, setIsLuckMode] = useState(false);
+  const [showLuckModal, setShowLuckModal] = useState(false);
+  const [luckCode, setLuckCode] = useState("");
+  const [luckCodeUsed, setLuckCodeUsed] = useState(false);
 
-  useEffect(() => {
-    if (firstVisit) localStorage.setItem(LS_FIRST_VISIT, "1");
-  }, [firstVisit]);
-
+  useEffect(() => { if (firstVisit) localStorage.setItem(LS_FIRST_VISIT, "1"); }, [firstVisit]);
   const t = I18N[lang];
 
   function payAndStart() {
@@ -681,7 +618,7 @@ export default function App() {
       const extra = prizeKey === "merch" ? { label: inventory.merch.label } : {};
       setPrize({ key: prizeKey, value: meta.value, ...extra });
       setStage("scratching");
-    }, 1000);
+    }, 800);
   }
 
   function instantStart() {
@@ -695,24 +632,30 @@ export default function App() {
   function onRevealed() {
     setStage("revealed");
     setInventory((prev) => consumeInventory(prev, prize.key));
-    // 如果中奖了，显示撒花动画
-    if (prize.value > 0 || prize.label) {
-      setShowConfetti(true);
-      setTimeout(() => setShowConfetti(false), 2000);
-    }
+    if (prize.value > 0 || prize.label) { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 2000); }
+    setLuckCodeUsed(false);
   }
 
   function reset() {
-    instantStart();
+    setIsLuckMode(false); setLuckCodeUsed(false); instantStart();
   }
 
-  // 展示列表：两行三列（按 value 升序 + 周边最后）
-  const numericKeys = ["zeropointtwo","one","ten","hundred","thousand"]; 
-  const supplyInfo = numericKeys
-    .sort((a,b)=> (DEFAULT_INVENTORY[a].value||0) - (DEFAULT_INVENTORY[b].value||0))
-    .map(key=>({key}));
-  supplyInfo.push({key:"merch"});
+  async function handleShare() {
+    setIsGeneratingShare(true);
+    try {
+      const imageDataURL = await generateShareImage(prize);
+      const link = document.createElement('a');
+      link.download = `zeta-gluck-${prize.value > 0 ? prize.value : 'participation'}-${Date.now()}.png`;
+      link.href = imageDataURL; document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    } catch (e) { console.error('生成分享图片失败:', e); alert('生成分享图片失败，请重试'); }
+    finally { setIsGeneratingShare(false); }
+  }
 
+  function handleLuckConfirm() { setIsLuckMode(true); setLuckCodeUsed(true); setShowLuckModal(false); instantStart(); }
+
+  const numericKeys = ["zeropointtwo", "one", "ten", "hundred", "thousand"];
+  const supplyInfo = numericKeys.sort((a, b) => (DEFAULT_INVENTORY[a].value || 0) - (DEFAULT_INVENTORY[b].value || 0)).map((key) => ({ key }));
+  supplyInfo.push({ key: "merch" });
   function labelFor(key) {
     switch (key) {
       case "zeropointtwo": return "0.2 ZETA * 5000";
@@ -725,61 +668,15 @@ export default function App() {
     }
   }
 
-  // ---- 运行时测试（不会抛错，仅 console 断言）----
-  useEffect(() => {
-    function runTests() {
-      try {
-        const keys = new Set(["none", "zeropointtwo", "one", "ten", "hundred", "twohundred", "fivehundred", "thousand", "merch"]);
-        // 权重键合法
-        BASE_WEIGHTS.forEach(w => console.assert(keys.has(w.key), `BASE_WEIGHTS key exists: ${w.key}`));
-        // 权重和接近 100（允许浮点误差）
-        const total = BASE_WEIGHTS.reduce((s,w)=>s+w.weight,0);
-        console.assert(Math.abs(total - 100) < 0.001, `weights sum ~ 100, got ${total}`);
-        // 降级链关键键存在
-        console.assert(["thousand","zeropointtwo"].every(k=>keys.has(k)), "chain keys exist");
-        // 抽奖结果键必须合法
-        for (let i = 0; i < 20; i++) {
-          const k = drawPrize(loadInventory());
-          console.assert(keys.has(k), `drawPrize legal key: ${k}`);
-        }
-        // 展示顺序与库存定义（含 thousand / merch）
-        console.assert(Array.isArray(supplyInfo) && supplyInfo.length === 6, "supplyInfo length 6");
-        const expectedOrder = ["zeropointtwo","one","ten","hundred","thousand","merch"];
-        console.assert(expectedOrder.every((k,i)=>supplyInfo[i].key===k), "grid sorted ascending by value with merch last");
-        // 标签不包含“剩余”
-        console.assert(!labelFor("one").includes("剩余"), "labels should not contain 剩余");
-        // 消费保护（不会减到负数）
-        const testInv = { ...DEFAULT_INVENTORY, one: { ...DEFAULT_INVENTORY.one, left: 0 } };
-        const consumed = consumeInventory(testInv, "one");
-        console.assert(consumed.one.left === 0, "consumeInventory should not go negative");
-        console.log("[Zeta Gluck] sanity tests passed");
-      } catch (e) {
-        console.warn("[Zeta Gluck] sanity tests encountered an issue", e);
-      }
-    }
-    runTests();
-  }, [lang]);
-
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <div className="mx-auto max-w-screen-sm p-4 sm:p-6">
-        {/* 顶部导航 */}
         <header className="flex items-center justify-between mb-6">
-          <div className="flex-1"></div>
-          <div className="text-2xl font-bold text-center bg-gradient-to-r from-emerald-600 to-emerald-800 bg-clip-text text-transparent animate-pulse">
-            Zeta Gluck Season <span className="inline-block animate-pulse bg-gradient-to-r from-emerald-600 to-emerald-800 bg-clip-text text-transparent">2</span>
-          </div>
+          <div className="flex-1" />
+          <div className="text-2xl font-bold text-center bg-gradient-to-r from-emerald-600 to-emerald-800 bg-clip-text text-transparent">Zeta Gluck Season 2</div>
           <div className="flex-1 flex justify-end gap-2">
-            <button 
-              className="px-3 py-2 text-xs font-medium text-emerald-700 bg-emerald-100 border border-emerald-300 rounded-lg hover:bg-emerald-200 transition-colors"
-            >
-              ZetaChain
-            </button>
-            <select 
-              value={lang} 
-              onChange={(e) => setLang(e.target.value)}
-              className="appearance-none bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-            >
+            <button className="px-3 py-2 text-xs font-medium text-emerald-700 bg-emerald-100 border border-emerald-300 rounded-lg">ZetaChain</button>
+            <select value={lang} onChange={(e) => setLang(e.target.value)} className="appearance-none bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
               <option value="zh">中文简体</option>
               <option value="en">English</option>
               <option value="ko">한국어</option>
@@ -787,138 +684,90 @@ export default function App() {
           </div>
         </header>
 
-        {/* ===== 主要内容：抽卡/刮奖（上方） ===== */}
-        <section className="rounded-3xl border-2 bg-gradient-to-br from-emerald-50 via-white to-emerald-50 p-6 sm:p-8 shadow-lg mb-6 ring-2 ring-emerald-100/60 hover:shadow-xl transition-all duration-300 relative overflow-hidden">
-          {/* 擦亮效果 */}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-[shimmer_3s_ease-in-out_infinite] pointer-events-none"></div>
-          
+        <section className={`rounded-3xl border-2 p-6 sm:p-8 shadow-lg mb-6 relative overflow-hidden ${isLuckMode ? 'bg-gradient-to-br from-purple-50 via-white to-purple-50 ring-2 ring-purple-100/60' : 'bg-gradient-to-br from-emerald-50 via-white to-emerald-50 ring-2 ring-emerald-100/60'}`}>
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
           <div className="mb-6 text-center relative z-10">
-            <div className="text-[12px] tracking-widest text-emerald-700/90 font-bold uppercase mb-2">{t.primaryLabel}</div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-3">
-              <TypewriterText 
-                texts={{
-                  zh: ["Gluck一下", "好运满满"],
-                  en: ["Gluck it", "Good luck"],
-                  ko: ["Gluck 해보기", "행운 가득"]
-                }}
-                lang={lang}
-              />
+            <div className={`text-[12px] tracking-widest font-bold uppercase mb-2 ${isLuckMode ? 'text-purple-700/90' : 'text-emerald-700/90'}`}>{isLuckMode ? '感谢您的支持🙏' : t.primaryLabel}</div>
+            <h2 className={`text-2xl sm:text-3xl font-bold mb-3 ${isLuckMode ? 'text-purple-800' : 'text-slate-900'}`}>
+              {isLuckMode ? '好运boost中🍀' : (
+                <TypewriterText texts={{ zh: ["Gluck一下", "好运满满"], en: ["Gluck it", "Good luck"], ko: ["Gluck 해보기", "행운 가득"] }} lang={lang} />
+              )}
             </h2>
             <p className="text-slate-600 text-sm mb-4">{t.desc}</p>
           </div>
 
-          {stage === "idle" && (
+          {stage === 'idle' && (
             <div className="flex flex-col items-center gap-4 relative z-10">
-              <button 
-                onClick={payAndStart} 
-                className="px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-bold text-lg shadow-lg hover:shadow-xl hover:from-emerald-700 hover:to-emerald-800 active:translate-y-0.5 transition-all duration-200 transform hover:scale-105"
-              >
-                {t.draw}
-              </button>
-              
-              {/* 今日剩余次数 */}
+              <button onClick={payAndStart} className={`px-8 py-4 rounded-2xl font-bold text-lg shadow-lg transition-all ${isLuckMode ? 'bg-gray-400 text-gray-600 cursor-not-allowed' : 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white'}`}>{isLuckMode ? 'B' : t.draw}</button>
               <div className="inline-flex items-center gap-2 bg-emerald-100 text-emerald-800 px-4 py-2 rounded-full text-sm font-semibold">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
                 {t.remainingToday}
               </div>
             </div>
           )}
 
-          {stage === "scratching" && (
+          {stage === 'scratching' && (
             <div className="relative mx-auto w-full max-w-[360px]">
-              <GiftCard prize={prize} t={t} />
+              <GiftCard prize={prize} t={t} isLuckMode={isLuckMode} />
               <div className="absolute inset-0">
                 <ScratchCanvas onReveal={onRevealed} t={t} />
               </div>
             </div>
           )}
 
-          {stage === "revealed" && (
+          {stage === 'revealed' && (
             <div className="flex flex-col items-center gap-6">
-              <GiftCard prize={prize} t={t} isRevealed={true} />
-              <button 
-                onClick={reset} 
-                className="px-6 py-3 rounded-xl bg-gradient-to-r from-slate-700 to-slate-800 text-white text-sm font-semibold hover:from-slate-800 hover:to-slate-900 shadow-lg hover:shadow-xl transition-all duration-200"
-              >
-                {t.tryAgain}
-              </button>
+              <GiftCard prize={prize} t={t} isRevealed={true} isLuckMode={isLuckMode} />
+              <div className="flex gap-4">
+                <button onClick={handleShare} disabled={isGeneratingShare} className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 text-white text-sm font-semibold disabled:opacity-50">{isGeneratingShare ? '生成中...' : t.shareJoy}</button>
+                <button onClick={reset} className="px-6 py-3 rounded-xl bg-gradient-to-r from-slate-700 to-slate-800 text-white text-sm font-semibold">{t.tryAgain}</button>
+                <button onClick={() => { if (isLuckMode) { setIsLuckMode(false); setLuckCodeUsed(false); instantStart(); } else { setShowLuckModal(true); } }} className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-purple-700 text-white text-sm font-semibold">好运翻倍</button>
+              </div>
             </div>
           )}
         </section>
 
-        {/* ===== 次要信息：奖池与库存（下方，两行三列） ===== */}
-        <section className="rounded-3xl border-2 bg-gradient-to-br from-slate-50 via-white to-slate-50 shadow-lg ring-2 ring-slate-100/60 hover:shadow-xl transition-all duration-300 overflow-hidden">
-          {/* 横幅滚动动画 */}
+        <section className="rounded-3xl border-2 bg-gradient-to-br from-slate-50 via-white to-slate-50 shadow-lg ring-2 ring-slate-100/60 overflow-hidden">
           <BannerAnimation />
-          
           <div className="p-6 sm:p-8">
             <div className="mb-6">
               <div className="text-[12px] tracking-widest text-slate-600 font-bold uppercase mb-2">{t.secondaryLabel}</div>
               <h3 className="text-xl font-bold text-slate-800 mb-2">{t.secondaryTitle}</h3>
               <p className="text-sm text-slate-600">{t.secondaryNote}</p>
             </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {supplyInfo.map((s) => {
-              const left = inventory[s.key].left;
-              const max = inventory[s.key].max;
-              const percent = Math.max(0, Math.min(100, Math.round((left / max) * 100)));
-              const animate = firstVisit && left === max; // 首访且满仓 → 动画
-              const isLowStock = percent < 20;
-              const isOutOfStock = percent === 0;
-              
-              return (
-                <div key={s.key} className={`rounded-2xl border-2 p-4 transition-all duration-300 hover:shadow-lg ${
-                  isOutOfStock 
-                    ? 'border-red-200 bg-red-50' 
-                    : isLowStock 
-                    ? 'border-orange-200 bg-orange-50' 
-                    : 'border-emerald-200 bg-white hover:border-emerald-300'
-                }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className={`text-xs font-semibold ${
-                      isOutOfStock ? 'text-red-600' : isLowStock ? 'text-orange-600' : 'text-slate-600'
-                    }`}>
-                      {labelFor(s.key)}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {supplyInfo.map((s) => {
+                const left = inventory[s.key].left; const max = inventory[s.key].max;
+                const percent = Math.max(0, Math.min(100, Math.round((left / max) * 100)));
+                const animate = firstVisit && left === max;
+                const isLowStock = percent < 20; const isOutOfStock = percent === 0;
+                return (
+                  <div key={s.key} className={`rounded-2xl border-2 p-4 transition-all duration-300 ${isOutOfStock ? 'border-red-200 bg-red-50' : isLowStock ? 'border-orange-200 bg-orange-50' : 'border-emerald-200 bg-white'}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className={`text-xs font-semibold ${isOutOfStock ? 'text-red-600' : isLowStock ? 'text-orange-600' : 'text-slate-600'}`}>{labelFor(s.key)}</div>
+                      <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${isOutOfStock ? 'bg-red-100 text-red-700' : isLowStock ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>{percent}%</span>
                     </div>
-                    <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${
-                      isOutOfStock 
-                        ? 'bg-red-100 text-red-700' 
-                        : isLowStock 
-                        ? 'bg-orange-100 text-orange-700' 
-                        : 'bg-emerald-100 text-emerald-700'
-                    }`}>
-                      {percent}%
-                    </span>
+                    <div className={`text-lg font-bold mb-2 ${isOutOfStock ? 'text-red-600' : isLowStock ? 'text-orange-600' : 'text-slate-800'}`}>{left} / {max}</div>
+                    <ProgressBar percent={percent} animate={animate} />
                   </div>
-                  <div className={`text-lg font-bold mb-2 ${
-                    isOutOfStock ? 'text-red-600' : isLowStock ? 'text-orange-600' : 'text-slate-800'
-                  }`}>
-                    {left} / {max}
-                  </div>
-                  <ProgressBar percent={percent} animate={animate} />
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
           </div>
         </section>
       </div>
 
-      <ReceiptAnimation show={stage === "paying"} t={t} />
+      <ReceiptAnimation show={stage === 'paying'} t={t} />
       <ConfettiAnimation show={showConfetti} />
+      <LuckModal show={showLuckModal} onClose={() => setShowLuckModal(false)} onConfirm={handleLuckConfirm} luckCode={luckCode} setLuckCode={setLuckCode} />
 
-      {/* 移动端适配：容器宽度已限制，UI 组件均为流式布局与相对尺寸 */}
       <style>{`
-        @keyframes shimmer {
-          0% {
-            transform: translateX(-100%);
-          }
-          100% {
-            transform: translateX(100%);
-          }
-        }
+        @keyframes shimmer { 0% { transform: translateX(-100%);} 100% { transform: translateX(100%);} }
+        @keyframes boost-glow { 0%, 100% { opacity: 1; text-shadow: 0 0 10px rgba(147, 51, 234, 0.5);} 50% { opacity: 0.8; text-shadow: 0 0 20px rgba(147, 51, 234, 0.8);} }
+        .boost-glow { animation: boost-glow 1.5s ease-in-out infinite; }
       `}</style>
     </div>
   );
 }
+
+export default App;
