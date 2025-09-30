@@ -9,60 +9,77 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@pythnetwork/entropy-sdk-solidity/IEntropy.sol";
 import "@pythnetwork/entropy-sdk-solidity/IEntropyConsumer.sol";
 
+/// @notice 外部 ManageLotteryCode 接口（只需用到的函数）
+interface IManageLotteryCode {
+    function setUsedBy(bytes32 codeHash, address user) external;
+    function usedBy(bytes32 codeHash) external view returns (address);
+    function codeExists(bytes32 codeHash) external view returns (bool);
+}
+
 /**
- * @title ZetaGachaStaking
- * @dev Free gacha (抽奖) 合约，使用 Pyth Entropy 作为安全随机源。
- * 用户仅支付 gas 和 entropy fee，不需要 stake/参与费。
- * 固定奖池 8000 ZETA（需要 Owner 一次性注入）。
+ * @title ZetaGachaStaking (integrated with ManageLotteryCode)
+ * @dev 使用 Pyth Entropy 作为随机性源。可对接 ManageLotteryCode：当用户提交邀请码时
+ *      本合约会调用 ManageLotteryCode.setUsedBy(codeHash, msg.sender) 将其标记为已使用，
+ *      并在随机分配时对非空奖项概率按「翻倍但不超过100%」的规则放大。
  */
 contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsumer {
     // ---------------- Constants ----------------
-    uint256 public constant FIXED_PRIZE_POOL = 8000 ether; // 固定奖池（更新为 8000 ZETA）
-    uint256 private constant PROB_DENOMINATOR = 1_000_000; // 百万分比 (ppm)
+    uint256 public constant FIXED_PRIZE_POOL = 0.5 ether;
+    uint256 private constant PROB_DENOMINATOR = 1_000_000; // ppm
 
-    // ---------------- Prize Tier 定义 ----------------
+    // ---------------- Prize Tier ----------------
     struct PrizeTier {
-        uint256 amount;      // 奖励额度（ZETA）
-        uint256 probability; // 概率（ppm）
-        uint256 maxSupply;   // 最大奖励数量
-        uint256 remaining;   // 剩余奖励数量
-        bool unlimited;      // 是否不限量
+        uint256 amount;      // 奖励金额（wei, 用 ether 单位写入）
+        uint256 probability; // 原始概率（ppm）
+        uint256 maxSupply;
+        uint256 remaining;
+        bool unlimited;
     }
 
-    // 奖励层级索引
-    uint8 public constant T_NONE          = 0;  // 未中奖（作为兜底，概率为剩余）
-    uint8 public constant T_0P1           = 1;  // 0.1 ZETA
-    uint8 public constant T_0P5           = 2;  // 0.5 ZETA
-    uint8 public constant T_1             = 3;  // 1 ZETA
-    uint8 public constant T_2             = 4;  // 2 ZETA
-    uint8 public constant T_5             = 5;  // 5 ZETA
-    uint8 public constant T_10            = 6;  // 10 ZETA
-    uint8 public constant T_20            = 7;  // 20 ZETA
-    uint8 public constant T_50            = 8;  // 50 ZETA
-    uint8 public constant T_100           = 9;  // 100 ZETA
-    uint8 public constant TIER_COUNT      = 10;
+    uint8 public constant T_NONE     = 0;
+    uint8 public constant T_0P1      = 1;
+    uint8 public constant T_0P5      = 2;
+    uint8 public constant T_1        = 3;
+    uint8 public constant T_2        = 4;
+    uint8 public constant T_5        = 5;
+    uint8 public constant T_10       = 6;
+    uint8 public constant T_20       = 7;
+    uint8 public constant T_50       = 8;
+    uint8 public constant T_100      = 9;
+    uint8 public constant TIER_COUNT = 10;
 
     // ---------------- State ----------------
-    uint256 public prizePoolBalance;      // 当前奖池余额
-    bool public activityEnded;            // 是否已结束活动
+    uint256 public prizePoolBalance;
+    bool public activityEnded;
 
     mapping(uint8 => PrizeTier) public prizeTiers;
 
     // Pyth Entropy
     IEntropy public immutable entropy;
     address public immutable entropyProvider;
-    mapping(uint64 => address) public pendingDraws; // sequenceNumber -> player
+
+    struct PendingDraw {
+        address player;
+        bytes32 codeHash; // bytes32(0) if none
+    }
+    mapping(uint64 => PendingDraw) public pendingDraws;
+
+    // ManageLotteryCode 合约引用（可由 owner 设置）
+    IManageLotteryCode public lotteryCode;
 
     // 用户抽奖次数限制
     mapping(address => uint32) public totalDraws;
     uint32 public constant MAX_DRAWS_PER_ADDRESS = 30;
 
     // ---------------- Events ----------------
-    event DrawRequested(address indexed player, uint64 indexed sequenceNumber, uint128 entropyFee);
-    event DrawCompleted(address indexed player, uint8 tierIndex, uint256 amount);
+    /// draw requested by user; include codeHash if any
+    event DrawRequested(address indexed player, uint64 indexed sequenceNumber, uint128 entropyFee, bytes32 codeHash);
+    /// draw completed; include codeHash if any
+    event DrawCompleted(address indexed player, uint8 tierIndex, uint256 amount, bytes32 codeHash);
     event PrizePoolSeeded(uint256 amount, uint256 newBalance);
     event ActivityEnded();
     event InventoryReset();
+    event LotteryCodeSet(address indexed mgr);
 
     // ---------------- Errors ----------------
     error InsufficientPrizePool();
@@ -79,26 +96,21 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
         entropy = IEntropy(_entropy);
         entropyProvider = _entropyProvider;
 
-        // 初始化奖励层级（新分布）
-        // 概率单位为 ppm（每百万分），合计 1,000,000。
-        // 100 ZETA 的给定概率 0.000005% 小于 1 ppm 的精度，采用最小 1 ppm 近似（0.0001%）。
-        // 其余概率按给定值设置，未分配的概率作为未中奖（T_NONE）。
-        // 概率求和（不含 T_NONE）：350000 + 150000 + 50000 + 20000 + 10000 + 5000 + 500 + 50 + 1 = 585,551
-        // T_NONE 概率 = 1,000,000 - 585,551 = 414,449 ppm（约 41.4449%）
+        // 初始化奖励层级（同你原设定）
         prizeTiers[T_NONE] = PrizeTier(0, 414_449, 0, 0, true);
 
-        prizeTiers[T_0P1]  = PrizeTier(0.1 ether, 350_000, 5000, 5000, false);   // 35%  N=5000
-        prizeTiers[T_0P5]  = PrizeTier(0.5 ether, 150_000, 1000, 1000, false);   // 15%  N=1000
-        prizeTiers[T_1]    = PrizeTier(1 ether,   50_000,  500,  500,  false);   // 5%   N=500
-        prizeTiers[T_2]    = PrizeTier(2 ether,   20_000,  500,  500,  false);   // 2%   N=500
-        prizeTiers[T_5]    = PrizeTier(5 ether,   10_000,  200,  200,  false);   // 1%   N=200
-        prizeTiers[T_10]   = PrizeTier(10 ether,   5_000,  150,  150,  false);   // 0.5% N=150
-        prizeTiers[T_20]   = PrizeTier(20 ether,     500,   50,   50,  false);   // 0.05% N=50
-        prizeTiers[T_50]   = PrizeTier(50 ether,      50,   20,   20,  false);   // 0.005% N=20
-        prizeTiers[T_100]  = PrizeTier(100 ether,      1,   10,   10,  false);   // ~0.0001% N=10（精度近似）
+        prizeTiers[T_0P1]  = PrizeTier(0.1 ether, 350_000, 5000, 5000, false);
+        prizeTiers[T_0P5]  = PrizeTier(0.5 ether, 150_000, 1000, 1000, false);
+        prizeTiers[T_1]    = PrizeTier(1 ether,   50_000,  500,  500,  false);
+        prizeTiers[T_2]    = PrizeTier(2 ether,   20_000,  500,  500,  false);
+        prizeTiers[T_5]    = PrizeTier(5 ether,   10_000,  200,  200,  false);
+        prizeTiers[T_10]   = PrizeTier(10 ether,   5_000,  150,  150,  false);
+        prizeTiers[T_20]   = PrizeTier(20 ether,     500,   50,   50,  false);
+        prizeTiers[T_50]   = PrizeTier(50 ether,      50,   20,   20,  false);
+        prizeTiers[T_100]  = PrizeTier(100 ether,      1,   10,   10,  false);
     }
 
-    // ---------------- Owner Functions ----------------
+    // ---------------- Owner functions ----------------
     function seedPrizePool() external payable onlyOwner {
         if (msg.value != FIXED_PRIZE_POOL) revert InsufficientPrizePool();
         if (activityEnded) revert ActivityAlreadyEnded();
@@ -116,11 +128,10 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
 
     function withdrawRemainingPrizePool() external onlyOwner {
         if (!activityEnded) revert ActivityNotEnded();
-        uint256 remaining = address(this).balance; 
+        uint256 remaining = address(this).balance;
         (bool success, ) = owner().call{value: remaining}("");
         require(success, "Prize pool withdrawal failed");
-
-        prizePoolBalance = 0; // 可选：清零逻辑余额
+        prizePoolBalance = 0;
     }
 
     function resetInventory() external onlyOwner {
@@ -139,8 +150,21 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
         _unpause();
     }
 
-    // ---------------- User Functions ----------------
-    function participateAndDraw(bytes32 userRandomNumber)
+    /// @notice 绑定 ManageLotteryCode 合约地址（owner 专用）
+    function setLotteryCode(address _mgr) external onlyOwner {
+        require(_mgr != address(0), "Invalid address");
+        lotteryCode = IManageLotteryCode(_mgr);
+        emit LotteryCodeSet(_mgr);
+    }
+
+    // ---------------- User functions ----------------
+
+    /**
+     * @notice 用户参与抽奖。可选传入 codeHash（bytes32(0) 表示无）。
+     * @param userRandomNumber 用户提供的随机数（会传递给 Pyth Entropy）
+     * @param codeHash 邀请码 hash（keccak256 原始 code），可为 bytes32(0)
+     */
+    function participateAndDraw(bytes32 userRandomNumber, bytes32 codeHash)
         external
         payable
         nonReentrant
@@ -148,69 +172,128 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
         returns (uint64 sequenceNumber)
     {
         require(userRandomNumber != bytes32(0), "Invalid random number");
-        
+
         if (activityEnded) revert ActivityAlreadyEnded();
         if (totalDraws[msg.sender] >= MAX_DRAWS_PER_ADDRESS) revert DrawLimitReached();
 
         uint128 entropyFee = entropy.getFee(entropyProvider);
         if (msg.value != entropyFee) revert EntropyFeeMismatch();
 
+        // 如果传入 codeHash（非 0），则先原子地在 ManageLotteryCode 上标记为已用
+        if (codeHash != bytes32(0)) {
+            // ensure lotteryCode has been set
+            require(address(lotteryCode) != address(0), "Lottery manager not set");
+            // will revert if code not exists or already used (ManageLotteryCode 的校验)
+            lotteryCode.setUsedBy(codeHash, msg.sender);
+        }
+
+        // 请求 entropy 随机数（在同一 tx 中，若上面失败会 revert）
         sequenceNumber = entropy.requestWithCallback{value: entropyFee}(
             entropyProvider,
             userRandomNumber
         );
 
+        // 记录 pending draw，包括 codeHash（可能为 0）
+        pendingDraws[sequenceNumber] = PendingDraw({
+            player: msg.sender,
+            codeHash: codeHash
+        });
 
         totalDraws[msg.sender] += 1;
-        pendingDraws[sequenceNumber] = msg.sender;
 
-        emit DrawRequested(msg.sender, sequenceNumber, entropyFee);
+        emit DrawRequested(msg.sender, sequenceNumber, entropyFee, codeHash);
         return sequenceNumber;
     }
 
     // ---------------- Entropy Callback ----------------
+    /// @dev Pyth Entropy 回调（内部覆盖实现）
     function entropyCallback(
         uint64 sequenceNumber,
         address provider,
         bytes32 randomNumber
     ) internal override {
-        address player = pendingDraws[sequenceNumber];
-        if (player == address(0)) revert DrawNotFound();
+        PendingDraw memory pd = pendingDraws[sequenceNumber];
+        if (pd.player == address(0)) revert DrawNotFound();
         delete pendingDraws[sequenceNumber];
 
-        (uint8 tierWon, uint256 prizeAmount) =
-            _determineAndDistribute(uint256(randomNumber), player);
+        bool usedCode = (pd.codeHash != bytes32(0));
 
-        emit DrawCompleted(player, tierWon, prizeAmount);
+        // 如果使用了 code，再次校验 on-chain usedBy 确实是当前玩家（额外防护）
+        if (usedCode) {
+            // 若 lotteryCode 未设置，则 treat as not used (shouldn't happen)
+            if (address(lotteryCode) != address(0)) {
+                address recorded = lotteryCode.usedBy(pd.codeHash);
+                // 如果被他人抢先篡改（理应不会），则当作未使用（降级）
+                if (recorded != pd.player) {
+                    usedCode = false;
+                }
+            } else {
+                usedCode = false;
+            }
+        }
+
+        (uint8 tierWon, uint256 prizeAmount) = _determineAndDistributeWithCode(uint256(randomNumber), pd.player, usedCode);
+
+        emit DrawCompleted(pd.player, tierWon, prizeAmount, pd.codeHash);
     }
 
     function getEntropy() internal view override returns (address) {
         return address(entropy);
     }
 
-    // ---------------- Internal Logic ----------------
-    function _determineAndDistribute(uint256 randomness, address player)
+    // ---------------- Internal logic ----------------
+
+    /// @notice 基于是否使用邀请码来决定概率分布；返回中奖 tier 与奖励金额
+    function _determineAndDistributeWithCode(uint256 randomness, address player, bool usedCode)
         internal
         returns (uint8 tierWon, uint256 prizeAmount)
     {
+        // 计算总非空概率
+        uint256 sumNonNone = 0;
+        for (uint8 i = 1; i < TIER_COUNT; i++) {
+            sumNonNone += prizeTiers[i].probability;
+        }
+
+        // 计算缩放因子（整数）
+        // targetFactor = 2 (翻倍)
+        uint256 factor = 1;
+        if (usedCode && sumNonNone > 0) {
+            // 若乘 2 不会超过 denom，则 factor = 2；否则 factor = floor(denom / sumNonNone)
+            if (sumNonNone * 2 <= PROB_DENOMINATOR) {
+                factor = 2;
+            } else {
+                factor = PROB_DENOMINATOR / sumNonNone; // >=1
+                if (factor == 0) factor = 1;
+            }
+        }
+
+        // 以缩放后的概率进行抽取（但保持 denom 不变）
         uint256 roll = randomness % PROB_DENOMINATOR;
         uint256 cumulative = 0;
         uint8 picked = T_NONE;
 
         for (uint8 i = 0; i < TIER_COUNT; i++) {
             uint256 p = prizeTiers[i].probability;
+            if (i != T_NONE && p > 0 && factor > 1) {
+                // 只对非空级应用 factor
+                p = p * factor;
+            }
             if (p == 0) continue;
             cumulative += p;
+            // 注意：若 factor >1 且 sumNonNone*factor > PROB_DENOMINATOR，cumulative 可能超过 denom
+            // 但 roll 的范围为 [0, PROB_DENOMINATOR-1]，比较仍然成立。
             if (roll < cumulative) {
                 picked = i;
                 break;
             }
         }
 
+        // 选出后做库存降级与发放
         tierWon = _downgradeFrom(picked);
         prizeAmount = _distributePrize(player, tierWon);
     }
 
+    /// @notice 奖励分发逻辑与剩余库存处理（与原逻辑一致）
     function _distributePrize(address player, uint8 tierIndex)
         internal
         returns (uint256 prizeAmount)
@@ -235,6 +318,7 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
         return prizeAmount;
     }
 
+    /// @notice 如果某个 tier 没库存则降级到下一级（与原逻辑一致）
     function _downgradeFrom(uint8 originalTier) internal view returns (uint8 newTier) {
         uint8 i = originalTier;
         while (true) {
@@ -243,14 +327,13 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
                 return i;
             }
             if (i == 0) break;
-            if (i > 0) {
-                 i -= 1;
-            }
+            unchecked { i -= 1; }
         }
         return T_NONE;
     }
 
     // ---------------- Views ----------------
+
     function getCurrentEntropyFee() external view returns (uint128 fee) {
         return entropy.getFee(entropyProvider);
     }

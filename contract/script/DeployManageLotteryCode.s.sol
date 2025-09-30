@@ -7,7 +7,7 @@ import "../src/ManageLotteryCode.sol";
 contract DeployManageLotteryCode is Script {
     function run() external {
         // 获取环境变量 PRIVATE_KEY 或默认 signer
-        uint256 deployerKey = vm.envUint("PRIVATE_KEY");
+        uint256 deployerKey = vm.envUint("PRIVATE_KEY_DEPLOYER");
         
         // 开始广播交易
         vm.startBroadcast(deployerKey);
