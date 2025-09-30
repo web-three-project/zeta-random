@@ -2,7 +2,6 @@
 /contract/out
 .env
 /contract/broadcast
-/contract/test
 /contract/cache
 /contract/build
 /contract/lib
