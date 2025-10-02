@@ -7,9 +7,9 @@ import {
   waitForTransactionReceipt,
   watchContractEvent,
 } from '@wagmi/core';
-  import { toHex } from 'viem';
+  import { toHex, keccak256 } from 'viem';
   
-  // ===== 合约 ABI（ZetaGachaStaking.sol）=====
+  // ===== 合约 ABI（ZetaGachaStaking.sol，对齐最新合约）=====
   export const ZetaGachaStakingAbi = [
     // constants / views
     { type: 'function', stateMutability: 'view', name: 'FIXED_PRIZE_POOL', inputs: [], outputs: [{ type: 'uint256' }] },
@@ -54,7 +54,10 @@ import {
       type: 'function',
       stateMutability: 'payable',
       name: 'participateAndDraw',
-      inputs: [{ type: 'bytes32', name: 'userRandomNumber' }],
+      inputs: [
+        { type: 'bytes32', name: 'userRandomNumber' },
+        { type: 'bytes32', name: 'codeHash' },
+      ],
       outputs: [{ type: 'uint64', name: 'sequenceNumber' }],
     },
   
@@ -66,7 +69,7 @@ import {
     { type: 'function', stateMutability: 'nonpayable', name: 'pause', inputs: [], outputs: [] },
     { type: 'function', stateMutability: 'nonpayable', name: 'unpause', inputs: [], outputs: [] },
   
-    // events
+    // events（包含 codeHash）
     {
       type: 'event',
       name: 'DrawRequested',
@@ -74,6 +77,7 @@ import {
         { indexed: true, name: 'player', type: 'address' },
         { indexed: true, name: 'sequenceNumber', type: 'uint64' },
         { indexed: false, name: 'entropyFee', type: 'uint128' },
+        { indexed: false, name: 'codeHash', type: 'bytes32' },
       ],
       anonymous: false,
     },
@@ -84,6 +88,7 @@ import {
         { indexed: true, name: 'player', type: 'address' },
         { indexed: false, name: 'tierIndex', type: 'uint8' },
         { indexed: false, name: 'amount', type: 'uint256' },
+        { indexed: false, name: 'codeHash', type: 'bytes32' },
       ],
       anonymous: false,
     },
@@ -103,6 +108,11 @@ import {
       for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 256);
     }
     return toHex(arr); // '0x' + 64 hex chars
+  }
+  
+  // 前端将邀请码字符串转为 keccak256(bytes(code))
+  export function codeStringToHash(code) {
+    return keccak256(toHex(code || ''));
   }
   
   // ===== 读方法 =====
@@ -169,6 +179,7 @@ import {
     config,
     contractAddress,
     userRandomNumber, // bytes32
+    codeHash = '0x0000000000000000000000000000000000000000000000000000000000000000', // 可选：邀请码哈希；无则传 0x0
     value,            // 可选：以 wei 指定。若不传将自动读取 entropy fee 作为 msg.value
   }) {
     const fee = value ?? await readEntropyFee({ config, contractAddress });
@@ -176,7 +187,7 @@ import {
       address: contractAddress,
       abi: ZetaGachaStakingAbi,
       functionName: 'participateAndDraw',
-      args: [userRandomNumber],
+      args: [userRandomNumber, codeHash],
       value: fee,
     });
     const receipt = await waitForTransactionReceipt(config, { hash });
