@@ -18,6 +18,7 @@ import {
     { type: 'function', stateMutability: 'view', name: 'owner', inputs: [], outputs: [{ type: 'address' }] },
     { type: 'function', stateMutability: 'view', name: 'MAX_DRAWS_PER_ADDRESS', inputs: [], outputs: [{ type: 'uint32' }] },
     { type: 'function', stateMutability: 'view', name: 'totalDraws', inputs: [{ type: 'address' }], outputs: [{ type: 'uint32' }] },
+    { type: 'function', stateMutability: 'view', name: 'remainingDraws', inputs: [{ type: 'address' }], outputs: [{ type: 'uint32' }] },
   
     // views - helpers
     { type: 'function', stateMutability: 'view', name: 'getCurrentEntropyFee', inputs: [], outputs: [{ type: 'uint128' }] },
@@ -97,6 +98,13 @@ import {
     { type: 'event', name: 'InventoryReset', inputs: [], anonymous: false },
   ];
   
+  // ===== 合约 ABI（ManageLotteryCode.sol，最小只读片段）=====
+  // 仅包含查询有效性所需的两个 getter：codeExists(bytes32) 与 usedBy(bytes32)
+  export const ManageLotteryCodeAbi = [
+    { type: 'function', stateMutability: 'view', name: 'codeExists', inputs: [{ type: 'bytes32' }], outputs: [{ type: 'bool' }] },
+    { type: 'function', stateMutability: 'view', name: 'usedBy',     inputs: [{ type: 'bytes32' }], outputs: [{ type: 'address' }] },
+  ];
+  
   // ===== 工具：前端生成 bytes32 随机数 =====
   export function randomBytes32() {
     // 浏览器环境生成 32 字节随机数
@@ -116,6 +124,33 @@ import {
   }
   
   // ===== 读方法 =====
+  
+  // 查询某个邀请码的状态（存在性 + 使用者）
+  // 返回：{ exists: boolean, usedBy: `0x...`, used: boolean }
+  export async function getLotteryCodeStatus({ config, managerAddress, codeHash }) {
+    const [exists, usedBy] = await Promise.all([
+      readContract(config, {
+        address: managerAddress,
+        abi: ManageLotteryCodeAbi,
+        functionName: 'codeExists',
+        args: [codeHash],
+      }),
+      readContract(config, {
+        address: managerAddress,
+        abi: ManageLotteryCodeAbi,
+        functionName: 'usedBy',
+        args: [codeHash],
+      }),
+    ]);
+    const used = usedBy !== '0x0000000000000000000000000000000000000000';
+    return { exists, usedBy, used };
+  }
+  
+  // 便捷函数：邀请码是否“有效”（定义为：存在 且 未被使用）
+  export async function isLotteryCodeValid({ config, managerAddress, codeHash }) {
+    const status = await getLotteryCodeStatus({ config, managerAddress, codeHash });
+    return status.exists && !status.used;
+  }
   export async function readEntropyFee({ config, contractAddress }) {
     return readContract(config, {
       address: contractAddress,
@@ -154,6 +189,16 @@ import {
       address: contractAddress,
       abi: ZetaGachaStakingAbi,
       functionName: 'MAX_DRAWS_PER_ADDRESS',
+    });
+  }
+  
+  // 查询某地址剩余抽奖次数（合约新增 view）
+  export async function getRemainingDraws({ config, contractAddress, userAddress }) {
+    return readContract(config, {
+      address: contractAddress,
+      abi: ZetaGachaStakingAbi,
+      functionName: 'remainingDraws',
+      args: [userAddress],
     });
   }
   

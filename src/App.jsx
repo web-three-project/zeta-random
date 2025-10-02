@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { WagmiProvider, createConfig, http, useAccount, useConnect, useDisconnect, useConfig } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { defineChain, formatUnits } from "viem";
-import { readEntropyFee, participateAndDraw, randomBytes32, onDrawCompleted } from "./lib/contract";
+import { readEntropyFee, participateAndDraw, randomBytes32, onDrawCompleted, codeStringToHash, isLotteryCodeValid, getRemainingDraws, getMaxDrawsPerUser } from "./lib/contract";
 
 // Zeta Gluck – React JSX module (converted from Gluck2.HTML)
 // Usage: import App from './Gluck2'; then render <App /> in your React app.
@@ -553,7 +553,7 @@ function ReceiptAnimation({ show, t }) {
 }
 
 // ---- Luck code modal ----
-function LuckModal({ show, onClose, onConfirm, luckCode, setLuckCode }) {
+function LuckModal({ show, onClose, onConfirm, luckCode }) {
   const [inputCode, setInputCode] = useState("");
   const [isValidating, setIsValidating] = useState(false);
 
@@ -561,18 +561,13 @@ function LuckModal({ show, onClose, onConfirm, luckCode, setLuckCode }) {
     if (inputCode.length === 8) {
       setIsValidating(true);
       setTimeout(() => {
-        setLuckCode(inputCode);
+        luckCode.current=inputCode;
         setIsValidating(false);
         onConfirm();
         onClose();
+        setInputCode("");
       }, 1000);
     }
-  };
-  const generateRandomCode = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = '';
-    for (let i = 0; i < 8; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
-    setInputCode(result);
   };
   if (!show) return null;
   return (
@@ -589,11 +584,10 @@ function LuckModal({ show, onClose, onConfirm, luckCode, setLuckCode }) {
             <input type="text" value={inputCode} onChange={(e) => setInputCode(e.target.value.toUpperCase())} placeholder="输入8位好运符" maxLength={8} className="w-full px-4 py-3 border border-slate-300 rounded-xl text-center text-lg font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500" />
             <div className="flex justify-between items-center mt-2">
               <span className="text-xs text-slate-500">{inputCode.length}/8 位</span>
-              <button onClick={generateRandomCode} className="text-xs text-purple-600 hover:text-purple-700 font-medium">随机生成</button>
             </div>
           </div>
           <div className="flex gap-3">
-            <button onClick={onClose} className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition-colors">取消</button>
+            <button onClick={()=>{onClose();setInputCode("")}} className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition-colors">取消</button>
             <button onClick={handleSubmit} disabled={inputCode.length !== 8 || isValidating} className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl font-medium disabled:opacity-50">{isValidating ? '验证中...' : '确认'}</button>
           </div>
         </div>
@@ -640,14 +634,43 @@ function MainApp() {
   const [isGeneratingShare, setIsGeneratingShare] = useState(false);
   const [isLuckMode, setIsLuckMode] = useState(false);
   const [showLuckModal, setShowLuckModal] = useState(false);
-  const [luckCode, setLuckCode] = useState("");
+  const luckCode=useRef("");
   const [luckCodeUsed, setLuckCodeUsed] = useState(false);
+  const [remainingDrawsToday, setRemainingDrawsToday] = useState(null);
+  const [maxDrawsPerDay, setMaxDrawsPerDay] = useState(null);
 
   // 钱包（wagmi hooks）
   const { address, isConnected } = useAccount();
   const { connectAsync, connectors } = useConnect();
   const { disconnect } = useDisconnect();
   const config = useConfig();
+
+  useEffect(()=>{
+    console.log("幸运",luckCode.current)
+  },[luckCode.current])
+
+  useEffect(()=>{
+    console.log("幸运模式?",isLuckMode)
+  },[isLuckMode])
+
+  // 实时获取当前地址剩余抽奖次数与上限
+  useEffect(() => {
+    const contractAddress = process.env.REACT_APP_CONTRACT_ADDRESS;
+    if (!config || !address || !contractAddress) { setRemainingDrawsToday(null); return; }
+    (async () => {
+      try {
+        const [remaining, max] = await Promise.all([
+          getRemainingDraws({ config, contractAddress, userAddress: address }),
+          getMaxDrawsPerUser({ config, contractAddress })
+        ]);
+        setRemainingDrawsToday(Number(remaining));
+        setMaxDrawsPerDay(Number(max));
+      } catch (e) {
+        console.warn('加载剩余次数失败', e);
+        setRemainingDrawsToday(null);
+      }
+    })();
+  }, [config, address]);
 
   function shortAddr(addr) {
     if (!addr) return "";
@@ -663,7 +686,42 @@ function MainApp() {
   useEffect(() => { if (firstVisit) localStorage.setItem(LS_FIRST_VISIT, "1"); }, [firstVisit]);
   const t = I18N[lang];
 
-  async function payAndStart() {
+  // 通用：发起上链抽奖（封装事件监听与交易）
+  async function startOnChainDraw(contractAddress, codeHash) {
+    // 临时事件监听：等待本地址的 DrawCompleted 后再进入刮奖
+    const unwatch = onDrawCompleted({
+      config,
+      contractAddress,
+      listener: (logs) => {
+        for (const log of logs) {
+          const player = (log.args?.player || '').toLowerCase?.();
+          if (!player || !address) continue;
+          if (player !== address.toLowerCase()) continue;
+          const amount = log.args?.amount ?? 0n;
+          const amountZeta = parseFloat(formatUnits(amount, 18));
+          const p = amountZeta > 0 ? { key: 'onchain', value: amountZeta } : { key: 'none', value: 0 };
+          setPrize(p);
+          setStage('scratching');
+          // 成功回调后刷新剩余次数
+          (async ()=>{
+            try {
+              const r = await getRemainingDraws({ config, contractAddress, userAddress: address });
+              setRemainingDrawsToday(Number(r));
+            } catch {}
+          })();
+          try { unwatch?.(); } catch {}
+          break;
+        }
+      }
+    });
+
+    const fee = await readEntropyFee({ config, contractAddress });
+    const userRandomNumber = randomBytes32();
+    await participateAndDraw({ config, contractAddress, userRandomNumber, codeHash, value: fee });
+  }
+
+  // 普通抽奖：不使用邀请码
+  async function payAndStartNormal() {
     try {
       // 连接钱包（如未连接）
       if (!isConnected) {
@@ -675,31 +733,21 @@ function MainApp() {
       const contractAddress = process.env.REACT_APP_CONTRACT_ADDRESS;
       if (!contractAddress) { alert('缺少 REACT_APP_CONTRACT_ADDRESS'); return; }
 
-      setStage('paying');
-
-      // 临时事件监听：等待本地址的 DrawCompleted 后再进入刮奖
-      const unwatch = onDrawCompleted({
-        config,
-        contractAddress,
-        listener: (logs) => {
-          for (const log of logs) {
-            const player = (log.args?.player || '').toLowerCase?.();
-            if (!player || !address) continue;
-            if (player !== address.toLowerCase()) continue;
-            const amount = log.args?.amount ?? 0n;
-            const amountZeta = parseFloat(formatUnits(amount, 18));
-            const p = amountZeta > 0 ? { key: 'onchain', value: amountZeta } : { key: 'none', value: 0 };
-            setPrize(p);
-            setStage('scratching');
-            try { unwatch?.(); } catch {}
-            break;
-          }
+      // 检查当前地址剩余抽奖次数
+      try {
+        const remaining = await getRemainingDraws({ config, contractAddress, userAddress: address });
+        if ((remaining ?? 0) === 0) {
+          alert('今日抽奖次数已用完');
+          return;
         }
-      });
-
-      const fee = await readEntropyFee({ config, contractAddress });
-      const userRandomNumber = randomBytes32();
-      await participateAndDraw({ config, contractAddress, userRandomNumber, value: fee });
+      } catch (e) {
+        console.error('查询剩余次数失败', e);
+        alert('查询剩余次数失败，请稍后重试');
+        return;
+      }
+      setStage('paying');
+      const zeroCode = '0x0000000000000000000000000000000000000000000000000000000000000000';
+      await startOnChainDraw(contractAddress, zeroCode);
       // 后续由事件回调推进到刮奖阶段
     } catch (e) {
       console.error('participateAndDraw failed', e);
@@ -708,23 +756,80 @@ function MainApp() {
     }
   }
 
-  function instantStart() {
-    const prizeKey = drawPrize(inventory);
-    const meta = BASE_WEIGHTS.find((w) => w.key === prizeKey) || { value: 0 };
-    const extra = prizeKey === "merch" ? { label: inventory.merch.label } : {};
-    setPrize({ key: prizeKey, value: meta.value, ...extra });
-    setStage("scratching");
+  // 好运翻倍抽奖：使用邀请码
+  async function payAndStartBoosted() {
+    try {
+      // 连接钱包（如未连接）
+      if (!isConnected) {
+        const preferred = connectors.find((c) => c.id === "injected") || connectors[0];
+        if (!preferred) { alert("未检测到浏览器钱包"); return; }
+        await connectAsync({ connector: preferred });
+      }
+
+      const contractAddress = process.env.REACT_APP_CONTRACT_ADDRESS;
+      if (!contractAddress) { alert('缺少 REACT_APP_CONTRACT_ADDRESS'); return; }
+
+      // 检查当前地址剩余抽奖次数
+      try {
+        const remaining = await getRemainingDraws({ config, contractAddress, userAddress: address });
+        if ((remaining ?? 0) === 0) {
+          alert('今日抽奖次数已用完');
+          return;
+        }
+      } catch (e) {
+        console.error('查询剩余次数失败', e);
+        alert('查询剩余次数失败，请稍后重试');
+        return;
+      }
+
+      // 邀请码校验（存在且未使用）
+      const raw = luckCode.current?.trim();
+      if (!raw) { alert('请输入8位抽奖码'); return; }
+      const managerAddress = process.env.REACT_APP_LOTTERY_CODE_ADDRESS;
+      if (!managerAddress) { alert('缺少 REACT_APP_LOTTERY_CODE_ADDRESS'); return; }
+      const codeHash = codeStringToHash(raw);
+      try {
+        const valid = await isLotteryCodeValid({ config, managerAddress, codeHash });
+        console.log('Boost校验', valid, raw, codeHash);
+        if (!valid) { 
+          alert('抽奖码无效或已被使用'); 
+          luckCode.current = '';
+          setIsLuckMode(false);
+          return; }
+      } catch (e) { console.error('校验邀请码失败', e); alert('校验邀请码失败，请稍后重试'); return; }
+
+      setStage('paying');
+      await startOnChainDraw(contractAddress, codeHash);
+      // 后续由事件回调推进到刮奖阶段
+    } catch (e) {
+      console.error('participateAndDraw boosted failed', e);
+      alert(e?.shortMessage || e?.message || '交易失败或已取消');
+      setStage('idle');
+    }
   }
 
   function onRevealed() {
+    console.log("揭晓",prize)
     setStage("revealed");
     setInventory((prev) => consumeInventory(prev, prize.key));
     if (prize.value > 0 || prize.label) { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 2000); }
+    // 若本次使用了邀请码，则在揭晓后消费掉：清空并退出 boost
+    if (luckCodeUsed) {
+      luckCode.current="";
+      setIsLuckMode(false);
+    }
     setLuckCodeUsed(false);
   }
 
   function reset() {
-    setIsLuckMode(false); setLuckCodeUsed(false); instantStart();
+    // 单次邀请码：使用后清空并退出 boost 模式
+    if (luckCodeUsed) {
+      luckCode.current="";
+      setLuckCodeUsed(false);
+      setIsLuckMode(false);
+    }
+    // 直接再次上链抽一次（普通）
+    payAndStartNormal();
   }
 
   async function handleShare() {
@@ -738,7 +843,12 @@ function MainApp() {
     finally { setIsGeneratingShare(false); }
   }
 
-  function handleLuckConfirm() { setIsLuckMode(true); setLuckCodeUsed(true); setShowLuckModal(false); instantStart(); }
+  function handleLuckConfirm() {
+    setIsLuckMode(true);
+    setLuckCodeUsed(true);
+    setShowLuckModal(false);
+    payAndStartBoosted();
+  }
 
   const numericKeys = ["zeropointtwo", "one", "ten", "hundred", "thousand"];
   const supplyInfo = numericKeys.sort((a, b) => (DEFAULT_INVENTORY[a].value || 0) - (DEFAULT_INVENTORY[b].value || 0)).map((key) => ({ key }));
@@ -797,10 +907,19 @@ function MainApp() {
 
           {stage === 'idle' && (
             <div className="flex flex-col items-center gap-4 relative z-10">
-              <button onClick={payAndStart} className={`px-8 py-4 rounded-2xl font-bold text-lg shadow-lg transition-all ${isLuckMode ? 'bg-gray-400 text-gray-600 cursor-not-allowed' : 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white'}`}>{isLuckMode ? 'B' : t.draw}</button>
+              <button onClick={() => (isLuckMode ? payAndStartBoosted() : payAndStartNormal())} disabled={isLuckMode && !luckCodeUsed} className={`px-8 py-4 rounded-2xl font-bold text-lg shadow-lg transition-all ${isLuckMode && !luckCodeUsed ? 'bg-gray-400 text-gray-600 cursor-not-allowed' : 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white'}`}>{isLuckMode ? (luckCodeUsed ? t.draw : '先确认抽奖码') : t.draw}</button>
               <div className="inline-flex items-center gap-2 bg-emerald-100 text-emerald-800 px-4 py-2 rounded-full text-sm font-semibold">
                 <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                {t.remainingToday}
+                {(() => {
+                  const r = remainingDrawsToday;
+                  const m = maxDrawsPerDay;
+                  const zh = `该地址今日剩余：${r ?? '-'}${m != null ? `/${m}` : ''}`;
+                  const en = `This address remaining today: ${r ?? '-'}${m != null ? `/${m}` : ''}`;
+                  const ko = `이 주소 오늘 남은 횟수: ${r ?? '-'}${m != null ? `/${m}` : ''}`;
+                  if (lang === 'zh') return zh;
+                  if (lang === 'ko') return ko;
+                  return en;
+                })()}
               </div>
             </div>
           )}
@@ -820,7 +939,7 @@ function MainApp() {
               <div className="flex gap-4">
                 <button onClick={handleShare} disabled={isGeneratingShare} className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 text-white text-sm font-semibold disabled:opacity-50">{isGeneratingShare ? '生成中...' : t.shareJoy}</button>
                 <button onClick={reset} className="px-6 py-3 rounded-xl bg-gradient-to-r from-slate-700 to-slate-800 text-white text-sm font-semibold">{t.tryAgain}</button>
-                <button onClick={() => { if (isLuckMode) { setIsLuckMode(false); setLuckCodeUsed(false); instantStart(); } else { setShowLuckModal(true); } }} className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-purple-700 text-white text-sm font-semibold">好运翻倍</button>
+                <button onClick={() => { if (isLuckMode) { setIsLuckMode(false); setLuckCodeUsed(false);  } else { setShowLuckModal(true); } }} className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-purple-700 text-white text-sm font-semibold">好运翻倍</button>
               </div>
             </div>
           )}
@@ -858,7 +977,7 @@ function MainApp() {
 
       <ReceiptAnimation show={stage === 'paying'} t={t} />
       <ConfettiAnimation show={showConfetti} />
-      <LuckModal show={showLuckModal} onClose={() => setShowLuckModal(false)} onConfirm={handleLuckConfirm} luckCode={luckCode} setLuckCode={setLuckCode} />
+      <LuckModal show={showLuckModal} onClose={() => setShowLuckModal(false)} onConfirm={handleLuckConfirm} luckCode={luckCode} />
 
       <style>{`
         @keyframes shimmer { 0% { transform: translateX(-100%);} 100% { transform: translateX(100%);} }
