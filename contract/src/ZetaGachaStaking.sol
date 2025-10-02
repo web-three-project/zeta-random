@@ -69,7 +69,7 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
 
     // 用户抽奖次数限制
     mapping(address => uint32) public totalDraws;
-    uint32 public constant MAX_DRAWS_PER_ADDRESS = 30;
+    uint32 public constant MAX_DRAWS_PER_ADDRESS = 5;
 
     // ---------------- Events ----------------
     /// draw requested by user; include codeHash if any
@@ -377,6 +377,15 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
             remaining[i] = tier.remaining;
             unlimited[i] = tier.unlimited;
         }
+    }
+
+    /// @notice 查询某地址剩余的抽奖次数（最大上限减去已用次数）
+    function remainingDraws(address user) external view returns (uint32 remaining) {
+        uint32 used = totalDraws[user];
+        if (used >= MAX_DRAWS_PER_ADDRESS) {
+            return 0;
+        }
+        return MAX_DRAWS_PER_ADDRESS - used;
     }
 
     // ---------------- Fallback ----------------

@@ -79,9 +79,24 @@ contract ManageLotteryCode {
             users[i] = usedBy[code];
         }
     }
-
     /// @notice 获取邀请码总数
     function totalCodes() external view returns (uint256) {
         return allCodes.length;
+    }
+
+    /// @notice 查询邀请码当前状态（存在性与使用者）
+    /// @param codeHash 邀请码 keccak256 哈希
+    /// @return exists 是否存在
+    /// @return user 使用该邀请码的用户地址（未使用则为 address(0)）
+    function getCodeStatus(bytes32 codeHash) external view returns (bool exists, address user) {
+        exists = codeExists[codeHash];
+        user = usedBy[codeHash];
+    }
+
+    /// @notice 邀请码是否有效（定义为：存在 且 未被使用）
+    /// @param codeHash 邀请码 keccak256 哈希
+    /// @return valid 是否有效
+    function isCodeValid(bytes32 codeHash) external view returns (bool valid) {
+        valid = codeExists[codeHash] && usedBy[codeHash] == address(0);
     }
 }
