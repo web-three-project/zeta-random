@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { WagmiProvider, createConfig, http, useAccount, useConnect, useDisconnect, useConfig } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { defineChain, formatUnits } from "viem";
-import { readEntropyFee, participateAndDraw, randomBytes32, onDrawCompleted, codeStringToHash, isLotteryCodeValid, getRemainingDraws, getMaxDrawsPerUser } from "./lib/contract";
+import { readEntropyFee, participateAndDraw, randomBytes32, onDrawCompleted, codeStringToHash, isLotteryCodeValid, getRemainingDraws, getMaxDrawsPerUser, getInventoryStatus } from "./lib/contract";
 
 // Zeta Gluck – React JSX module (converted from Gluck2.HTML)
 // Usage: import App from './Gluck2'; then render <App /> in your React app.
@@ -20,7 +20,6 @@ const DEFAULT_INVENTORY = {
   twohundred: { max: 5, left: 5, value: 200 },
   fivehundred: { max: 2, left: 2, value: 500 },
   thousand: { max: 1, left: 1, value: 1000 },
-  merch: { max: 10, left: 10, value: 0, label: "ZETA特别周边" },
 };
 
 function loadInventory() {
@@ -36,11 +35,11 @@ function loadInventory() {
       twohundred: { ...DEFAULT_INVENTORY.twohundred, ...(parsed.twohundred || {}) },
       fivehundred: { ...DEFAULT_INVENTORY.fivehundred, ...(parsed.fivehundred || {}) },
       thousand: { ...DEFAULT_INVENTORY.thousand, ...(parsed.thousand || {}) },
-      merch: { ...DEFAULT_INVENTORY.merch, ...(parsed.merch || {}) },
     };
   } catch (e) {
     return { ...DEFAULT_INVENTORY };
   }
+
 }
 
 function saveInventory(inv) {
@@ -89,7 +88,6 @@ const BASE_WEIGHTS = [
   { key: "none", weight: 44.445, unlimited: true, value: 0 },
   { key: "fivehundred", weight: 0, unlimited: false, value: 500 },
   { key: "twohundred", weight: 0, unlimited: false, value: 200 },
-  { key: "merch", weight: 0, unlimited: false, value: 0 },
 ];
 
 function weightedPick(weights) {
@@ -104,7 +102,7 @@ function weightedPick(weights) {
 }
 
 function demotePrize(key, inv) {
-  const chain = ["thousand", "fivehundred", "twohundred", "hundred", "ten", "one", "zeropointtwo", "merch", "none"];
+  const chain = ["thousand", "fivehundred", "twohundred", "hundred", "ten", "one", "zeropointtwo", "none"];
   let idx = chain.indexOf(key);
   if (idx === -1) return "none";
   while (idx < chain.length) {
@@ -128,7 +126,7 @@ function drawPrize(inv) {
 
 function consumeInventory(inv, key) {
   const copy = JSON.parse(JSON.stringify(inv));
-  if (["zeropointtwo", "one", "ten", "hundred", "twohundred", "fivehundred", "thousand", "merch"].includes(key) && copy[key].left > 0) {
+  if (["zeropointtwo", "one", "ten", "hundred", "twohundred", "fivehundred", "thousand"].includes(key) && copy[key].left > 0) {
     copy[key].left -= 1;
   }
   saveInventory(copy);
@@ -638,6 +636,7 @@ function MainApp() {
   const [luckCodeUsed, setLuckCodeUsed] = useState(false);
   const [remainingDrawsToday, setRemainingDrawsToday] = useState(null);
   const [maxDrawsPerDay, setMaxDrawsPerDay] = useState(null);
+  const [chainInv, setChainInv] = useState(null); // { amounts, probabilities, maxSupplies, remaining, unlimited }
 
   // 钱包（wagmi hooks）
   const { address, isConnected } = useAccount();
@@ -672,6 +671,43 @@ function MainApp() {
     })();
   }, [config, address]);
 
+  // 读取链上库存信息
+  async function fetchInventory() {
+    try {
+      const contractAddress = process.env.REACT_APP_CONTRACT_ADDRESS;
+      if (!contractAddress) return;
+      const res = await getInventoryStatus({ config, contractAddress });
+      setChainInv({
+        amounts: res[0],
+        probabilities: res[1],
+        maxSupplies: res[2],
+        remaining: res[3],
+        unlimited: res[4],
+      });
+    } catch (e) {
+      console.warn('[inventory] failed to fetch on-chain inventory', e);
+    }
+  }
+
+  // 页面加载时读取一次
+  useEffect(() => { fetchInventory(); }, []);
+
+  // 基于链上返回构建展示条目（按 0.5/1/10/100/1000/merch 顺序）
+  function formatZetaAmount(wei) {
+    try { return formatUnits(wei, 18); } catch { return '0'; }
+  }
+  // 根据合约经济模型展示 tier 1..9（0 为未中奖）
+  const importantTierIndices = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+  const displayTiers = chainInv && chainInv.amounts
+    ? importantTierIndices.map((i) => ({
+        index: i,
+        amountWei: chainInv.amounts[i],
+        amountLabel: `${formatZetaAmount(chainInv.amounts[i])} ZETA`,
+        max: Number(chainInv.maxSupplies[i]) || 0,
+        left: Number(chainInv.remaining[i]) || 0,
+      }))
+    : null;
+
   function shortAddr(addr) {
     if (!addr) return "";
     return addr.slice(0, 6) + "..." + addr.slice(-4);
@@ -702,11 +738,12 @@ function MainApp() {
           const p = amountZeta > 0 ? { key: 'onchain', value: amountZeta } : { key: 'none', value: 0 };
           setPrize(p);
           setStage('scratching');
-          // 成功回调后刷新剩余次数
+          // 成功回调后刷新剩余次数与链上库存
           (async ()=>{
             try {
               const r = await getRemainingDraws({ config, contractAddress, userAddress: address });
               setRemainingDrawsToday(Number(r));
+              void fetchInventory();
             } catch {}
           })();
           try { unwatch?.(); } catch {}
@@ -850,20 +887,6 @@ function MainApp() {
     payAndStartBoosted();
   }
 
-  const numericKeys = ["zeropointtwo", "one", "ten", "hundred", "thousand"];
-  const supplyInfo = numericKeys.sort((a, b) => (DEFAULT_INVENTORY[a].value || 0) - (DEFAULT_INVENTORY[b].value || 0)).map((key) => ({ key }));
-  supplyInfo.push({ key: "merch" });
-  function labelFor(key) {
-    switch (key) {
-      case "zeropointtwo": return "0.2 ZETA * 5000";
-      case "one": return "1 ZETA * 1000";
-      case "ten": return "10 ZETA * 100";
-      case "hundred": return "100 ZETA * 10";
-      case "thousand": return "1000 ZETA * 1";
-      case "merch": return I18N[lang].merchLabel;
-      default: return key;
-    }
-  }
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -954,22 +977,26 @@ function MainApp() {
               <p className="text-sm text-slate-600">{t.secondaryNote}</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {supplyInfo.map((s) => {
-                const left = inventory[s.key].left; const max = inventory[s.key].max;
-                const percent = Math.max(0, Math.min(100, Math.round((left / max) * 100)));
-                const animate = firstVisit && left === max;
-                const isLowStock = percent < 20; const isOutOfStock = percent === 0;
-                return (
-                  <div key={s.key} className={`rounded-2xl border-2 p-4 transition-all duration-300 ${isOutOfStock ? 'border-red-200 bg-red-50' : isLowStock ? 'border-orange-200 bg-orange-50' : 'border-emerald-200 bg-white'}`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className={`text-xs font-semibold ${isOutOfStock ? 'text-red-600' : isLowStock ? 'text-orange-600' : 'text-slate-600'}`}>{labelFor(s.key)}</div>
-                      <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${isOutOfStock ? 'bg-red-100 text-red-700' : isLowStock ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>{percent}%</span>
+              {displayTiers ? (
+                displayTiers.map((t1) => {
+                  const rawPercent = t1.max > 0 ? (t1.left / t1.max) * 100 : 0;
+                  const percent = Math.max(0, Math.min(100, Math.round(rawPercent)));
+                  const animate = firstVisit && t1.left === t1.max;
+                  const isLowStock = percent < 20; const isOutOfStock = percent === 0;
+                  return (
+                    <div key={`tier-${t1.index}`} className={`rounded-2xl border-2 p-4 transition-all duration-300 ${isOutOfStock ? 'border-red-200 bg-red-50' : isLowStock ? 'border-orange-200 bg-orange-50' : 'border-emerald-200 bg-white'}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className={`text-xs font-semibold ${isOutOfStock ? 'text-red-600' : isLowStock ? 'text-orange-600' : 'text-slate-600'}`}>{`${t1.amountLabel} * ${t1.max}`}</div>
+                        <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${isOutOfStock ? 'bg-red-100 text-red-700' : isLowStock ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>{rawPercent.toFixed(3)}%</span>
+                      </div>
+                      <div className={`text-lg font-bold mb-2 ${isOutOfStock ? 'text-red-600' : isLowStock ? 'text-orange-600' : 'text-slate-800'}`}>{t1.left} / {t1.max}</div>
+                      <ProgressBar percent={percent} animate={animate} />
                     </div>
-                    <div className={`text-lg font-bold mb-2 ${isOutOfStock ? 'text-red-600' : isLowStock ? 'text-orange-600' : 'text-slate-800'}`}>{left} / {max}</div>
-                    <ProgressBar percent={percent} animate={animate} />
-                  </div>
-                );
-              })}
+                  );
+                })
+              ) : (
+                <div className="text-sm text-slate-500">正在读取链上库存…</div>
+              )}
             </div>
           </div>
         </section>
