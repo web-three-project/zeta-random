@@ -16,8 +16,7 @@ import {
     { type: 'function', stateMutability: 'view', name: 'prizePoolBalance', inputs: [], outputs: [{ type: 'uint256' }] },
     { type: 'function', stateMutability: 'view', name: 'activityEnded', inputs: [], outputs: [{ type: 'bool' }] },
     { type: 'function', stateMutability: 'view', name: 'owner', inputs: [], outputs: [{ type: 'address' }] },
-    { type: 'function', stateMutability: 'view', name: 'MAX_DRAWS_PER_ADDRESS', inputs: [], outputs: [{ type: 'uint32' }] },
-    { type: 'function', stateMutability: 'view', name: 'totalDraws', inputs: [{ type: 'address' }], outputs: [{ type: 'uint32' }] },
+    { type: 'function', stateMutability: 'view', name: 'MAX_DRAWS_PER_DAY', inputs: [], outputs: [{ type: 'uint32' }] },
     { type: 'function', stateMutability: 'view', name: 'remainingDraws', inputs: [{ type: 'address' }], outputs: [{ type: 'uint32' }] },
   
     // views - helpers
@@ -175,20 +174,11 @@ import {
     });
   }
   
-  export async function getUserDrawCount({ config, contractAddress, userAddress }) {
+  export async function getMaxDrawsPerDay({ config, contractAddress }) {
     return readContract(config, {
       address: contractAddress,
       abi: ZetaGachaStakingAbi,
-      functionName: 'totalDraws',
-      args: [userAddress],
-    });
-  }
-  
-  export async function getMaxDrawsPerUser({ config, contractAddress }) {
-    return readContract(config, {
-      address: contractAddress,
-      abi: ZetaGachaStakingAbi,
-      functionName: 'MAX_DRAWS_PER_ADDRESS',
+      functionName: 'MAX_DRAWS_PER_DAY',
     });
   }
   

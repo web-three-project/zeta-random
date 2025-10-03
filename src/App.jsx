@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { WagmiProvider, createConfig, http, useAccount, useConnect, useDisconnect, useConfig } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { defineChain, formatUnits } from "viem";
-import { readEntropyFee, participateAndDraw, randomBytes32, onDrawCompleted, codeStringToHash, isLotteryCodeValid, getRemainingDraws, getMaxDrawsPerUser, getInventoryStatus } from "./lib/contract";
+import { readEntropyFee, participateAndDraw, randomBytes32, onDrawCompleted, codeStringToHash, isLotteryCodeValid, getRemainingDraws, getMaxDrawsPerDay, getInventoryStatus } from "./lib/contract";
 
 // Zeta Gluck – React JSX module (converted from Gluck2.HTML)
 // Usage: import App from './Gluck2'; then render <App /> in your React app.
@@ -660,7 +660,7 @@ function MainApp() {
       try {
         const [remaining, max] = await Promise.all([
           getRemainingDraws({ config, contractAddress, userAddress: address }),
-          getMaxDrawsPerUser({ config, contractAddress })
+          getMaxDrawsPerDay({ config, contractAddress })
         ]);
         setRemainingDrawsToday(Number(remaining));
         setMaxDrawsPerDay(Number(max));

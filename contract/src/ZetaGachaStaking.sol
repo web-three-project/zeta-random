@@ -68,9 +68,13 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
     // ManageLotteryCode 合约引用（可由 owner 设置）
     IManageLotteryCode public lotteryCode;
 
-    // 用户抽奖次数限制
-    mapping(address => uint32) public totalDraws;
-    uint32 public constant MAX_DRAWS_PER_ADDRESS = 5;
+    // 每日（UTC+8）抽奖次数限制 - 方案A
+    struct UserDaily {
+        uint32 dayId; // (block.timestamp + 8 hours) / 1 days
+        uint32 used;  // 当日已用次数
+    }
+    mapping(address => UserDaily) public dailyUsage;
+    uint32 public constant MAX_DRAWS_PER_DAY = 10;
 
     // ---------------- Events ----------------
     /// draw requested by user; include codeHash if any
@@ -175,7 +179,14 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
         require(userRandomNumber != bytes32(0), "Invalid random number");
 
         if (activityEnded) revert ActivityAlreadyEnded();
-        if (totalDraws[msg.sender] >= MAX_DRAWS_PER_ADDRESS) revert DrawLimitReached();
+        // 使用东八区“自然日”进行日配额判断
+        uint32 today = _todayDayId();
+        UserDaily storage u = dailyUsage[msg.sender];
+        if (u.dayId != today) {
+            u.dayId = today;
+            u.used = 0;
+        }
+        if (u.used >= MAX_DRAWS_PER_DAY) revert DrawLimitReached();
 
         uint128 entropyFee = entropy.getFee(entropyProvider);
         if (msg.value != entropyFee) revert EntropyFeeMismatch();
@@ -200,7 +211,8 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
             codeHash: codeHash
         });
 
-        totalDraws[msg.sender] += 1;
+        // 递增当日已用次数
+        u.used += 1;
 
         emit DrawRequested(msg.sender, sequenceNumber, entropyFee, codeHash);
         return sequenceNumber;
@@ -243,6 +255,11 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
     }
 
     // ---------------- Internal logic ----------------
+
+    /// @notice 获取当前的东八区日编号（用于每日限额重置）
+    function _todayDayId() internal view returns (uint32) {
+        return uint32((block.timestamp + 8 hours) / 1 days);
+    }
 
     /// @notice 基于是否使用邀请码来决定概率分布；返回中奖 tier 与奖励金额
     function _determineAndDistributeWithCode(uint256 randomness, address player, bool usedCode)
@@ -377,13 +394,15 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
         }
     }
 
-    /// @notice 查询某地址剩余的抽奖次数（最大上限减去已用次数）
+    /// @notice 查询某地址当日剩余的抽奖次数（基于东八区自然日）
     function remainingDraws(address user) external view returns (uint32 remaining) {
-        uint32 used = totalDraws[user];
-        if (used >= MAX_DRAWS_PER_ADDRESS) {
+        uint32 today = _todayDayId();
+        UserDaily memory u = dailyUsage[user];
+        uint32 used = (u.dayId == today) ? u.used : 0;
+        if (used >= MAX_DRAWS_PER_DAY) {
             return 0;
         }
-        return MAX_DRAWS_PER_ADDRESS - used;
+        return MAX_DRAWS_PER_DAY - used;
     }
 
     // ---------------- Fallback ----------------
