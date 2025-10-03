@@ -19,12 +19,13 @@ interface IManageLotteryCode {
 /**
  * @title ZetaGachaStaking (integrated with ManageLotteryCode)
  * @dev 使用 Pyth Entropy 作为随机性源。可对接 ManageLotteryCode：当用户提交邀请码时
- *      本合约会调用 ManageLotteryCode.setUsedBy(codeHash, msg.sender) 将其标记为已使用，
- *      并在随机分配时对非空奖项概率按「翻倍但不超过100%」的规则放大。
+ * 本合约会调用 ManageLotteryCode.setUsedBy(codeHash, msg.sender) 将其标记为已使用，
+ * 并在随机分配时对非空奖项概率按「1.5倍」的规则放大。
  */
 contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsumer {
     // ---------------- Constants ----------------
-    uint256 public constant FIXED_PRIZE_POOL = 2 ether;
+    // 保持原样，如果实际投入是 8 ether，可以考虑改为 8 ether。
+    uint256 public constant FIXED_PRIZE_POOL = 2 ether; 
     uint256 private constant PROB_DENOMINATOR = 1_000_000; // ppm
 
     // ---------------- Prize Tier ----------------
@@ -96,7 +97,7 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
         entropy = IEntropy(_entropy);
         entropyProvider = _entropyProvider;
 
-        // 初始化奖励层级（同你原设定）
+        // 初始化奖励层级（保持原设定）
         prizeTiers[T_NONE] = PrizeTier(0, 414_449, 0, 0, true);
 
         prizeTiers[T_0P1]  = PrizeTier(0.1 ether, 350_000, 5000, 5000, false);
@@ -248,40 +249,37 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
         internal
         returns (uint8 tierWon, uint256 prizeAmount)
     {
-        // 计算总非空概率
-        uint256 sumNonNone = 0;
-        for (uint8 i = 1; i < TIER_COUNT; i++) {
-            sumNonNone += prizeTiers[i].probability;
+        // === START OF MODIFICATION for 1.5x ===
+        
+        // 使用分子/分母来表示放大系数 1.5x (即 3/2)
+        uint256 NUMERATOR = 1;
+        uint256 DENOMINATOR = 1;
+
+        if (usedCode) {
+            // Hardcode 1.5x scaling (3/2)
+            NUMERATOR = 3;
+            DENOMINATOR = 2;
         }
 
-        // 计算缩放因子（整数）
-        // targetFactor = 2 (翻倍)
-        uint256 factor = 1;
-        if (usedCode && sumNonNone > 0) {
-            // 若乘 2 不会超过 denom，则 factor = 2；否则 factor = floor(denom / sumNonNone)
-            if (sumNonNone * 2 <= PROB_DENOMINATOR) {
-                factor = 2;
-            } else {
-                factor = PROB_DENOMINATOR / sumNonNone; // >=1
-                if (factor == 0) factor = 1;
-            }
-        }
-
-        // 以缩放后的概率进行抽取（但保持 denom 不变）
+        // 以缩放后的概率进行抽取（保持 PROB_DENOMINATOR 不变）
         uint256 roll = randomness % PROB_DENOMINATOR;
         uint256 cumulative = 0;
         uint8 picked = T_NONE;
 
         for (uint8 i = 0; i < TIER_COUNT; i++) {
             uint256 p = prizeTiers[i].probability;
-            if (i != T_NONE && p > 0 && factor > 1) {
-                // 只对非空级应用 factor
-                p = p * factor;
+            
+            // 只对非空级应用放大，且仅在 NUMERATOR > DENOMINATOR (即放大) 时执行
+            if (i != T_NONE && p > 0 && NUMERATOR > DENOMINATOR) {
+                // 应用 1.5x 缩放: p = (p * NUMERATOR) / DENOMINATOR
+                p = (p * NUMERATOR) / DENOMINATOR;
             }
+            // === END OF MODIFICATION ===
+            
             if (p == 0) continue;
+            
             cumulative += p;
-            // 注意：若 factor >1 且 sumNonNone*factor > PROB_DENOMINATOR，cumulative 可能超过 denom
-            // 但 roll 的范围为 [0, PROB_DENOMINATOR-1]，比较仍然成立。
+            // 注意：放大后的累积概率可能超过 PROB_DENOMINATOR，但 roll 的范围为 [0, PROB_DENOMINATOR-1]，比较仍然成立。
             if (roll < cumulative) {
                 picked = i;
                 break;
