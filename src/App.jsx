@@ -3,6 +3,7 @@ import { WagmiProvider, createConfig, http, useAccount, useConnect, useDisconnec
 import { injected } from "wagmi/connectors";
 import { defineChain, formatUnits } from "viem";
 import { readEntropyFee, participateAndDraw, randomBytes32, onDrawCompleted, codeStringToHash, isLotteryCodeValid, getRemainingDraws, getMaxDrawsPerDay, getInventoryStatus } from "./lib/contract";
+import AlertModal from "./components/AlertModal";
 
 // Zeta Gluck – React JSX module (converted from Gluck2.HTML)
 // Usage: import App from './Gluck2'; then render <App /> in your React app.
@@ -637,6 +638,14 @@ function MainApp() {
   const [remainingDrawsToday, setRemainingDrawsToday] = useState(null);
   const [maxDrawsPerDay, setMaxDrawsPerDay] = useState(null);
   const [chainInv, setChainInv] = useState(null); // { amounts, probabilities, maxSupplies, remaining, unlimited }
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertMsg, setAlertMsg] = useState("");
+  const [alertTitle, setAlertTitle] = useState("提示");
+  const triggerAlert = (message, title = '提示') => {
+    setAlertTitle(title);
+    setAlertMsg(message);
+    setAlertOpen(true);
+  };
 
   // 钱包（wagmi hooks）
   const { address, isConnected } = useAccount();
@@ -715,7 +724,7 @@ function MainApp() {
 
   async function onConnectWallet() {
     const preferred = connectors.find((c) => c.id === "injected") || connectors[0];
-    if (!preferred) { alert("未检测到浏览器钱包"); return; }
+    if (!preferred) { triggerAlert("未检测到浏览器钱包"); return; }
     await connectAsync({ connector: preferred });
   }
 
@@ -763,23 +772,23 @@ function MainApp() {
       // 连接钱包（如未连接）
       if (!isConnected) {
         const preferred = connectors.find((c) => c.id === "injected") || connectors[0];
-        if (!preferred) { alert("未检测到浏览器钱包"); return; }
+        if (!preferred) { triggerAlert("未检测到浏览器钱包"); return; }
         await connectAsync({ connector: preferred });
       }
 
       const contractAddress = process.env.REACT_APP_CONTRACT_ADDRESS;
-      if (!contractAddress) { alert('缺少 REACT_APP_CONTRACT_ADDRESS'); return; }
+      if (!contractAddress) { triggerAlert('缺少 REACT_APP_CONTRACT_ADDRESS'); return; }
 
       // 检查当前地址剩余抽奖次数
       try {
         const remaining = await getRemainingDraws({ config, contractAddress, userAddress: address });
         if ((remaining ?? 0) === 0) {
-          alert('今日抽奖次数已用完');
+          triggerAlert('今日抽奖次数已用完');
           return;
         }
       } catch (e) {
         console.error('查询剩余次数失败', e);
-        alert('查询剩余次数失败，请稍后重试');
+        triggerAlert('查询剩余次数失败，请稍后重试');
         return;
       }
       setStage('paying');
@@ -788,7 +797,7 @@ function MainApp() {
       // 后续由事件回调推进到刮奖阶段
     } catch (e) {
       console.error('participateAndDraw failed', e);
-      alert(e?.shortMessage || e?.message || '交易失败或已取消');
+      triggerAlert(e?.shortMessage || e?.message || '交易失败或已取消');
       setStage('idle');
     }
   }
@@ -799,48 +808,50 @@ function MainApp() {
       // 连接钱包（如未连接）
       if (!isConnected) {
         const preferred = connectors.find((c) => c.id === "injected") || connectors[0];
-        if (!preferred) { alert("未检测到浏览器钱包"); return; }
+        if (!preferred) { triggerAlert("未检测到浏览器钱包"); return; }
         await connectAsync({ connector: preferred });
       }
 
       const contractAddress = process.env.REACT_APP_CONTRACT_ADDRESS;
-      if (!contractAddress) { alert('缺少 REACT_APP_CONTRACT_ADDRESS'); return; }
+      if (!contractAddress) { triggerAlert('缺少 REACT_APP_CONTRACT_ADDRESS'); return; }
 
       // 检查当前地址剩余抽奖次数
       try {
         const remaining = await getRemainingDraws({ config, contractAddress, userAddress: address });
         if ((remaining ?? 0) === 0) {
-          alert('今日抽奖次数已用完');
+          triggerAlert('今日抽奖次数已用完');
           return;
         }
       } catch (e) {
         console.error('查询剩余次数失败', e);
-        alert('查询剩余次数失败，请稍后重试');
+        triggerAlert('查询剩余次数失败，请稍后重试');
         return;
       }
 
       // 邀请码校验（存在且未使用）
       const raw = luckCode.current?.trim();
-      if (!raw) { alert('请输入8位抽奖码'); return; }
+      if (!raw) { triggerAlert('请输入8位抽奖码'); return; }
       const managerAddress = process.env.REACT_APP_LOTTERY_CODE_ADDRESS;
-      if (!managerAddress) { alert('缺少 REACT_APP_LOTTERY_CODE_ADDRESS'); return; }
+      if (!managerAddress) { triggerAlert('缺少 REACT_APP_LOTTERY_CODE_ADDRESS'); return; }
       const codeHash = codeStringToHash(raw);
       try {
         const valid = await isLotteryCodeValid({ config, managerAddress, codeHash });
         console.log('Boost校验', valid, raw, codeHash);
         if (!valid) { 
-          alert('抽奖码无效或已被使用'); 
+          setAlertTitle('提示');
+          setAlertMsg('抽奖码无效或已被使用');
+          setAlertOpen(true);
           luckCode.current = '';
           setIsLuckMode(false);
           return; }
-      } catch (e) { console.error('校验邀请码失败', e); alert('校验邀请码失败，请稍后重试'); return; }
+      } catch (e) { console.error('校验邀请码失败', e); triggerAlert('校验邀请码失败，请稍后重试'); return; }
 
       setStage('paying');
       await startOnChainDraw(contractAddress, codeHash);
       // 后续由事件回调推进到刮奖阶段
     } catch (e) {
       console.error('participateAndDraw boosted failed', e);
-      alert(e?.shortMessage || e?.message || '交易失败或已取消');
+      triggerAlert(e?.shortMessage || e?.message || '交易失败或已取消');
       setStage('idle');
     }
   }
@@ -876,7 +887,7 @@ function MainApp() {
       const link = document.createElement('a');
       link.download = `zeta-gluck-${prize.value > 0 ? prize.value : 'participation'}-${Date.now()}.png`;
       link.href = imageDataURL; document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    } catch (e) { console.error('生成分享图片失败:', e); alert('生成分享图片失败，请重试'); }
+    } catch (e) { console.error('生成分享图片失败:', e); triggerAlert('生成分享图片失败，请重试'); }
     finally { setIsGeneratingShare(false); }
   }
 
@@ -1005,6 +1016,7 @@ function MainApp() {
       <ReceiptAnimation show={stage === 'paying'} t={t} />
       <ConfettiAnimation show={showConfetti} />
       <LuckModal show={showLuckModal} onClose={() => setShowLuckModal(false)} onConfirm={handleLuckConfirm} luckCode={luckCode} />
+      <AlertModal show={alertOpen} title={alertTitle} message={alertMsg} onClose={() => setAlertOpen(false)} />
 
       <style>{`
         @keyframes shimmer { 0% { transform: translateX(-100%);} 100% { transform: translateX(100%);} }
