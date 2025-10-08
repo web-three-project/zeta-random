@@ -315,6 +315,7 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
     {
         PrizeTier storage tier = prizeTiers[tierIndex];
         if (!tier.unlimited) {
+            require(tier.remaining > 0, "Tier depleted");
             if (tier.remaining == 0) {
                 tierIndex = _downgradeFrom(tierIndex);
                 tier = prizeTiers[tierIndex];
@@ -325,7 +326,7 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
 
         prizeAmount = tier.amount;
         if (prizeAmount > 0) {
-            if (prizePoolBalance < prizeAmount) revert InsufficientPrizePool();
+            require(prizePoolBalance >= prizeAmount, "Insufficient prize pool");
             prizePoolBalance -= prizeAmount;
             (bool success, ) = player.call{value: prizeAmount}("");
             require(success, "Prize transfer failed");
@@ -342,7 +343,9 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
                 return i;
             }
             if (i == 0) break;
-            unchecked { i -= 1; }
+            if (i > 0) {
+                i -= 1;
+            }
         }
         return T_NONE;
     }
