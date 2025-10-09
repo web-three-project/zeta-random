@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { WagmiProvider, createConfig, http, useAccount, useConnect, useDisconnect, useConfig } from "wagmi";
 import { injected } from "wagmi/connectors";
-import { defineChain, formatUnits } from "viem";
-import { readEntropyFee, participateAndDraw, randomBytes32, onDrawCompleted, codeStringToHash, isLotteryCodeValid, getRemainingDraws, getMaxDrawsPerDay, getInventoryStatus } from "./lib/contract";
+import { defineChain, formatUnits, decodeEventLog, keccak256, toBytes } from "viem";
+import { readEntropyFee, participateAndDraw, randomBytes32, onDrawCompleted, codeStringToHash, isLotteryCodeValid, getRemainingDraws, getMaxDrawsPerDay, getInventoryStatus, ZetaGachaStakingAbi } from "./lib/contract";
 import AlertModal from "./components/AlertModal";
 
 // Zeta Gluck – React JSX module (converted from Gluck2.HTML)
@@ -653,13 +653,13 @@ function MainApp() {
   const { disconnect } = useDisconnect();
   const config = useConfig();
 
-  useEffect(()=>{
-    console.log("幸运",luckCode.current)
-  },[luckCode.current])
+  // useEffect(()=>{
+  //   console.log("幸运",luckCode.current)
+  // },[luckCode.current])
 
-  useEffect(()=>{
-    console.log("幸运模式?",isLuckMode)
-  },[isLuckMode])
+  // useEffect(()=>{
+  //   console.log("幸运模式?",isLuckMode)
+  // },[isLuckMode])
 
   // 实时获取当前地址剩余抽奖次数与上限
   useEffect(() => {
@@ -734,6 +734,8 @@ function MainApp() {
   // 通用：发起上链抽奖（封装事件监听与交易）
   async function startOnChainDraw(contractAddress, codeHash) {
     // 临时事件监听：等待本地址的 DrawCompleted 后再进入刮奖
+    let resolved = false;
+    let timeoutId;
     const unwatch = onDrawCompleted({
       config,
       contractAddress,
@@ -745,6 +747,8 @@ function MainApp() {
           const amount = log.args?.amount ?? 0n;
           const amountZeta = parseFloat(formatUnits(amount, 18));
           const p = amountZeta > 0 ? { key: 'onchain', value: amountZeta } : { key: 'none', value: 0 };
+          resolved = true;
+          clearTimeout?.(timeoutId);
           setPrize(p);
           setStage('scratching');
           // 成功回调后刷新剩余次数与链上库存
@@ -763,7 +767,50 @@ function MainApp() {
 
     const fee = await readEntropyFee({ config, contractAddress });
     const userRandomNumber = randomBytes32();
-    await participateAndDraw({ config, contractAddress, userRandomNumber, codeHash, value: fee });
+    const receipt = await participateAndDraw({ config, contractAddress, userRandomNumber, codeHash, value: fee });
+
+    // 兜底：若在一定时间内未收到事件，尝试从本次交易回执中解码 DrawCompleted
+    timeoutId = setTimeout(() => {
+      if (resolved) return;
+      try {
+        const topic0 = keccak256(toBytes('DrawCompleted(address,uint8,uint256,bytes32)'));
+        const targetLogs = (receipt?.logs || []).filter((l) =>
+          (l?.address?.toLowerCase?.() === contractAddress.toLowerCase()) && Array.isArray(l?.topics) && l.topics[0] === topic0
+        );
+        for (const l of targetLogs) {
+          try {
+            const decoded = decodeEventLog({ abi: ZetaGachaStakingAbi, data: l.data, topics: l.topics });
+            if (decoded?.eventName !== 'DrawCompleted') continue;
+            const player = (decoded?.args?.player || '').toLowerCase?.();
+            if (!player || !address || player !== address.toLowerCase()) continue;
+            const amount = decoded?.args?.amount ?? 0n;
+            const amountZeta = parseFloat(formatUnits(amount, 18));
+            const p = amountZeta > 0 ? { key: 'onchain', value: amountZeta } : { key: 'none', value: 0 };
+            resolved = true;
+            setPrize(p);
+            setStage('scratching');
+            (async ()=>{
+              try {
+                const r = await getRemainingDraws({ config, contractAddress, userAddress: address });
+                setRemainingDrawsToday(Number(r));
+                void fetchInventory();
+              } catch {}
+            })();
+            try { unwatch?.(); } catch {}
+            break;
+          } catch {}
+        }
+        if (!resolved) {
+          // 仍未解析到事件，提示用户稍后在区块确认完成后重试
+          setStage('idle'); // 关闭出票动画
+          triggerAlert('网络较慢或事件延迟，若页面未跳转，请稍后点击再试。', '提示');
+        }
+      } catch (e) {
+        console.warn('[fallback] decode receipt logs failed', e);
+        setStage('idle'); // 关闭出票动画
+        triggerAlert('网络较慢或事件延迟，若页面未跳转，请稍后点击再试。', '提示');
+      }
+    }, 20000); // 20s 超时兜底
   }
 
   // 普通抽奖：不使用邀请码
