@@ -63,7 +63,7 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
         address player;
         bytes32 codeHash; // bytes32(0) if none
     }
-    mapping(uint64 => PendingDraw) public pendingDraws;
+    mapping(uint64 => PendingDraw) private pendingDraws;
 
     // ManageLotteryCode 合约引用（可由 owner 设置）
     IManageLotteryCode public lotteryCode;
@@ -225,6 +225,9 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
         address provider,
         bytes32 randomNumber
     ) internal override {
+        require(provider == entropyProvider, "Invalid provider");
+        require(randomNumber != bytes32(0), "Invalid random number");
+        
         PendingDraw memory pd = pendingDraws[sequenceNumber];
         if (pd.player == address(0)) revert DrawNotFound();
         delete pendingDraws[sequenceNumber];
