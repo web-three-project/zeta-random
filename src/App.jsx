@@ -74,9 +74,9 @@ const zetaMainnet = defineChain({
 });
 
 const wagmiConfig = createConfig({
-  chains: [zetaAthens],
+  chains: [zetaMainnet],
   connectors: [injected()],
-  transports: { [zetaAthens.id]: http(zetaAthens.rpcUrls.default.http[0]) },
+  transports: { [zetaMainnet.id]: http(zetaMainnet.rpcUrls.default.http[0]) },
 });
 
 // ---- Weights / drawing ----
@@ -945,6 +945,73 @@ function MainApp() {
     payAndStartBoosted();
   }
 
+  // Zeta Mainnet 网络配置
+  const zetaMainnetConfig = {
+    chainId: '0x1b58', // 7000 in hex
+    chainName: 'ZetaChain Mainnet',
+    nativeCurrency: {
+      name: 'ZETA',
+      symbol: 'ZETA',
+      decimals: 18,
+    },
+    rpcUrls: ['https://zetachain-evm.blockpi.network/v1/rpc/public'],
+    blockExplorerUrls: ['https://explorer.zetachain.com'],
+  };
+
+  async function addAndSwitchNetwork(networkConfig) {
+    // 检查是否安装了 MetaMask 或其他兼容钱包
+    if (typeof window.ethereum === 'undefined') {
+      triggerAlert('请安装 MetaMask 或其他 Web3 钱包');
+      return;
+    }
+  
+    // 1. 尝试直接切换网络
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: networkConfig.chainId }],
+      });
+      triggerAlert(`成功切换到 ${networkConfig.chainName}`);
+  
+    } catch (switchError) {
+      // 检查错误代码，4902 表示网络未添加
+      if (switchError.code === 4902) {
+        console.log(`网络 ${networkConfig.chainName} 尚未添加，正在尝试添加...`);
+        
+        // 2. 尝试添加网络
+        try {
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [networkConfig],
+          });
+          
+          triggerAlert(`网络 ${networkConfig.chainName} 添加成功！`);
+          
+          // 可选：添加成功后再次尝试切换
+          await window.ethereum.request({
+               method: 'wallet_switchEthereumChain',
+               params: [{ chainId: networkConfig.chainId }],
+          });
+  
+        } catch (addError) {
+          // 用户拒绝添加网络，或其他添加错误
+          console.error('添加网络失败或用户拒绝:', addError);
+          triggerAlert('用户拒绝添加网络或操作失败');
+        }
+      } else {
+        // 其他切换错误（如用户拒绝切换）
+        console.error('切换网络失败:', switchError);
+        triggerAlert('切换网络失败，请检查您的钱包设置');
+      }
+    }
+  }
+
+  // 切换到 Zeta Mainnet
+  async function switchToZetaMainnet() {
+    await addAndSwitchNetwork(zetaMainnetConfig);
+  }
+  
+
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -967,6 +1034,7 @@ function MainApp() {
           {isConnected ? (
             <>
               <span className="text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 font-mono" title={address}>{shortAddr(address)}</span>
+              <button  className="text-[11px] px-2 py-0.5 rounded border border-purple-300 text-purple-700 hover:bg-purple-50">请切换到 Zeta Mainnet</button>
               <button onClick={() => disconnect()} className="text-[11px] px-2 py-0.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-50">断开连接</button>
             </>
           ) : (
