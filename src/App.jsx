@@ -705,16 +705,18 @@ function MainApp() {
   function formatZetaAmount(wei) {
     try { return formatUnits(wei, 18); } catch { return '0'; }
   }
-  // 根据合约经济模型展示 tier 1..9（0 为未中奖）
-  const importantTierIndices = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+  // 根据合约经济模型展示 tier 1..5（0 为未中奖，6-9 已移除）
+  const importantTierIndices = [1, 2, 3, 4, 5];
   const displayTiers = chainInv && chainInv.amounts
-    ? importantTierIndices.map((i) => ({
-        index: i,
-        amountWei: chainInv.amounts[i],
-        amountLabel: `${formatZetaAmount(chainInv.amounts[i])} ZETA`,
-        max: Number(chainInv.maxSupplies[i]) || 0,
-        left: Number(chainInv.remaining[i]) || 0,
-      }))
+    ? importantTierIndices
+        .map((i) => ({
+          index: i,
+          amountWei: chainInv.amounts[i],
+          amountLabel: `${formatZetaAmount(chainInv.amounts[i])} ZETA`,
+          max: Number(chainInv.maxSupplies[i]) || 0,
+          left: Number(chainInv.remaining[i]) || 0,
+        }))
+        .filter((t) => t.max > 0) // 过滤掉已移除的奖项
     : null;
 
   function shortAddr(addr) {

@@ -24,8 +24,7 @@ interface IManageLotteryCode {
  */
 contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsumer {
     // ---------------- Constants ----------------
-    // 保持原样，如果实际投入是 8 ether，可以考虑改为 8 ether。
-    uint256 public constant FIXED_PRIZE_POOL = 2 ether; 
+    uint256 public constant FIXED_PRIZE_POOL = 1 ether; 
     uint256 private constant PROB_DENOMINATOR = 1_000_000; // ppm
 
     // ---------------- Prize Tier ----------------
@@ -105,14 +104,14 @@ contract ZetaGachaStaking is Ownable, ReentrancyGuard, Pausable, IEntropyConsume
         prizeTiers[T_NONE] = PrizeTier(0, 414_449, 0, 0, true);
 
         prizeTiers[T_0P1]  = PrizeTier(0.1 ether, 350_000, 5000, 5000, false);
-        prizeTiers[T_0P5]  = PrizeTier(0.5 ether, 150_000, 1000, 1000, false);
+        prizeTiers[T_0P5]  = PrizeTier(0.5 ether, 150_000,  620,  620, false);
         prizeTiers[T_1]    = PrizeTier(1 ether,   50_000,  500,  500,  false);
         prizeTiers[T_2]    = PrizeTier(2 ether,   20_000,  500,  500,  false);
         prizeTiers[T_5]    = PrizeTier(5 ether,   10_000,  200,  200,  false);
-        prizeTiers[T_10]   = PrizeTier(10 ether,   5_000,  150,  150,  false);
-        prizeTiers[T_20]   = PrizeTier(20 ether,     500,   50,   50,  false);
-        prizeTiers[T_50]   = PrizeTier(50 ether,      50,   20,   20,  false);
-        prizeTiers[T_100]  = PrizeTier(100 ether,      1,   10,   10,  false);
+        prizeTiers[T_10]   = PrizeTier(0,              0,    0,    0,  false);
+        prizeTiers[T_20]   = PrizeTier(0,              0,    0,    0,  false);
+        prizeTiers[T_50]   = PrizeTier(0,              0,    0,    0,  false);
+        prizeTiers[T_100]  = PrizeTier(0,              0,    0,    0,  false);
     }
 
     // ---------------- Owner functions ----------------
