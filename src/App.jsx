@@ -285,7 +285,7 @@ const I18N = {
     shareImageScan: "Scan to join Gluck",
   },
   ko: {
-    primaryLabel: "오늘 운이 어떤가요?",
+    primaryLabel: "오늘의 운세를 확인해보세요",
     headline: "Gluck 해보기",
     desc: "주소당 하루 10회 무료 기회, 23:59 UTC+8에 리셋",
     draw: "운 시험해보기",
@@ -308,14 +308,14 @@ const I18N = {
     receiptPrinting: "· 출력 중…",
     merchLabel: "ZETA 한정 굿즈 * 10",
     language: "언어",
-    shareJoy: "기쁨 공유",
+    shareJoy: "운세 공유",
     // Alert Modal
     alertDefault: "알림",
     alertConfirm: "확인",
     // Luck Modal
-    luckModalTitle: "KOL의 행운 코드 입력",
-    luckModalDesc: "8자리 영숫자 코드를 입력하세요",
-    luckModalPlaceholder: "8자리 행운 코드 입력",
+    luckModalTitle: "KOL 추천 코드를 입력하세요",
+    luckModalDesc: "8자리 영문자 또는 숫자를 입력해주세요",
+    luckModalPlaceholder: "8자리 행운 코드를 입력하세요",
     luckModalCharCount: (count) => `${count}/8 자`,
     luckModalCancel: "취소",
     luckModalConfirm: "확인",
@@ -323,7 +323,7 @@ const I18N = {
     // Wallet & Network
     connectWallet: "지갑 연결",
     disconnect: "연결 해제",
-    switchToZeta: "Zeta Mainnet으로 전환하세요",
+    switchToZeta: "Zeta 메인넷으로 전환",
     // Gift Card
     boostUsed: "부스트 사용됨",
     thankYouParticipation: "다음에 더 좋은 운이",
@@ -332,7 +332,7 @@ const I18N = {
     supportThanks: "지원해 주셔서 감사합니다🙏",
     boostActive: "행운 부스트 활성화🍀",
     confirmCodeFirst: "먼저 코드 확인",
-    luckBoost: "행운 부스트",
+    luckBoost: "더 큰 행운!",
     generating: "생성 중...",
     // Inventory
     loadingInventory: "온체인 재고 읽는 중…",
