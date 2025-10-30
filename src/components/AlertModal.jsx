@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function AlertModal({ show, title = "提示", message, onClose }) {
+export default function AlertModal({ show, title, message, onClose, t }) {
   if (!show) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -16,7 +16,7 @@ export default function AlertModal({ show, title = "提示", message, onClose })
               onClick={onClose}
               className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 text-white text-sm font-semibold"
             >
-              确定
+              {t?.alertConfirm || "OK"}
             </button>
           </div>
         </div>

@@ -161,6 +161,54 @@ const I18N = {
     merchLabel: "ZETA 限量周边 * 10",
     language: "语言",
     shareJoy: "分享喜悦",
+    // Alert Modal
+    alertDefault: "提示",
+    alertConfirm: "确定",
+    // Luck Modal
+    luckModalTitle: "输入来自KOL的好运符",
+    luckModalDesc: "请输入8位随机字母或数字",
+    luckModalPlaceholder: "输入8位好运符",
+    luckModalCharCount: (count) => `${count}/8 位`,
+    luckModalCancel: "取消",
+    luckModalConfirm: "确认",
+    luckModalValidating: "验证中...",
+    // Wallet & Network
+    connectWallet: "连接钱包",
+    disconnect: "断开连接",
+    switchToZeta: "请切换到 Zeta Mainnet",
+    // Gift Card
+    boostUsed: "Boost已使用",
+    thankYouParticipation: "谢谢参与",
+    followTwitter: "关注推特 @ZetaChain_CH 好运翻倍",
+    // Main Section
+    supportThanks: "感谢您的支持🙏",
+    boostActive: "好运boost中🍀",
+    confirmCodeFirst: "先确认抽奖码",
+    luckBoost: "好运翻倍",
+    generating: "生成中...",
+    // Inventory
+    loadingInventory: "正在读取链上库存…",
+    // Alert Messages
+    walletNotDetected: "未检测到浏览器钱包",
+    missingContractAddress: "缺少 REACT_APP_CONTRACT_ADDRESS",
+    dailyLimitReached: "今日抽奖次数已用完",
+    queryRemainingFailed: "查询剩余次数失败，请稍后重试",
+    transactionFailed: "交易失败或已取消",
+    missingLotteryAddress: "缺少 REACT_APP_LOTTERY_CODE_ADDRESS",
+    enter8DigitCode: "请输入8位抽奖码",
+    codeInvalidOrUsed: "抽奖码无效或已被使用",
+    codeValidationFailed: "校验邀请码失败，请稍后重试",
+    networkSlowOrDelay: "网络较慢或事件延迟，若页面未跳转，请稍后点击再试。",
+    generateShareFailed: "生成分享图片失败，请重试",
+    installMetamask: "请安装 MetaMask 或其他 Web3 钱包",
+    networkSwitched: (chainName) => `成功切换到 ${chainName}`,
+    networkNotAdded: (chainName) => `网络 ${chainName} 尚未添加，正在尝试添加...`,
+    networkAddSuccess: (chainName) => `网络 ${chainName} 添加成功！`,
+    networkAddRejected: "用户拒绝添加网络或操作失败",
+    networkSwitchFailed: "切换网络失败，请检查您的钱包设置",
+    // Share Image
+    shareImageSubtitle: "好运就在Gluck，S2赛季等你来",
+    shareImageScan: "扫码参与 Gluck",
   },
   en: {
     primaryLabel: "How's your luck today?",
@@ -187,6 +235,54 @@ const I18N = {
     merchLabel: "ZETA limited merch * 10",
     language: "Language",
     shareJoy: "Share Joy",
+    // Alert Modal
+    alertDefault: "Notice",
+    alertConfirm: "OK",
+    // Luck Modal
+    luckModalTitle: "Enter Lucky Code from KOL",
+    luckModalDesc: "Please enter 8-digit alphanumeric code",
+    luckModalPlaceholder: "Enter 8-digit code",
+    luckModalCharCount: (count) => `${count}/8 chars`,
+    luckModalCancel: "Cancel",
+    luckModalConfirm: "Confirm",
+    luckModalValidating: "Validating...",
+    // Wallet & Network
+    connectWallet: "Connect Wallet",
+    disconnect: "Disconnect",
+    switchToZeta: "Please switch to Zeta Mainnet",
+    // Gift Card
+    boostUsed: "Boost Used",
+    thankYouParticipation: "Better luck next time",
+    followTwitter: "Follow @ZetaChain_CH for double luck",
+    // Main Section
+    supportThanks: "Thank you for your support🙏",
+    boostActive: "Lucky boost active🍀",
+    confirmCodeFirst: "Confirm code first",
+    luckBoost: "Lucky Boost",
+    generating: "Generating...",
+    // Inventory
+    loadingInventory: "Loading on-chain inventory…",
+    // Alert Messages
+    walletNotDetected: "Browser wallet not detected",
+    missingContractAddress: "Missing REACT_APP_CONTRACT_ADDRESS",
+    dailyLimitReached: "Daily draw limit reached",
+    queryRemainingFailed: "Failed to query remaining draws, please try again later",
+    transactionFailed: "Transaction failed or cancelled",
+    missingLotteryAddress: "Missing REACT_APP_LOTTERY_CODE_ADDRESS",
+    enter8DigitCode: "Please enter 8-digit lottery code",
+    codeInvalidOrUsed: "Lottery code invalid or already used",
+    codeValidationFailed: "Failed to validate invitation code, please try again later",
+    networkSlowOrDelay: "Network slow or event delayed, if page doesn't redirect, please try again later.",
+    generateShareFailed: "Failed to generate share image, please retry",
+    installMetamask: "Please install MetaMask or other Web3 wallet",
+    networkSwitched: (chainName) => `Successfully switched to ${chainName}`,
+    networkNotAdded: (chainName) => `Network ${chainName} not added yet, trying to add...`,
+    networkAddSuccess: (chainName) => `Network ${chainName} added successfully!`,
+    networkAddRejected: "User rejected adding network or operation failed",
+    networkSwitchFailed: "Failed to switch network, please check your wallet settings",
+    // Share Image
+    shareImageSubtitle: "Good luck at Gluck, S2 awaits you",
+    shareImageScan: "Scan to join Gluck",
   },
   ko: {
     primaryLabel: "오늘 운이 어떤가요?",
@@ -213,6 +309,54 @@ const I18N = {
     merchLabel: "ZETA 한정 굿즈 * 10",
     language: "언어",
     shareJoy: "기쁨 공유",
+    // Alert Modal
+    alertDefault: "알림",
+    alertConfirm: "확인",
+    // Luck Modal
+    luckModalTitle: "KOL의 행운 코드 입력",
+    luckModalDesc: "8자리 영숫자 코드를 입력하세요",
+    luckModalPlaceholder: "8자리 행운 코드 입력",
+    luckModalCharCount: (count) => `${count}/8 자`,
+    luckModalCancel: "취소",
+    luckModalConfirm: "확인",
+    luckModalValidating: "확인 중...",
+    // Wallet & Network
+    connectWallet: "지갑 연결",
+    disconnect: "연결 해제",
+    switchToZeta: "Zeta Mainnet으로 전환하세요",
+    // Gift Card
+    boostUsed: "부스트 사용됨",
+    thankYouParticipation: "다음에 더 좋은 운이",
+    followTwitter: "@ZetaChain_CH 팔로우하고 행운 두 배",
+    // Main Section
+    supportThanks: "지원해 주셔서 감사합니다🙏",
+    boostActive: "행운 부스트 활성화🍀",
+    confirmCodeFirst: "먼저 코드 확인",
+    luckBoost: "행운 부스트",
+    generating: "생성 중...",
+    // Inventory
+    loadingInventory: "온체인 재고 읽는 중…",
+    // Alert Messages
+    walletNotDetected: "브라우저 지갑이 감지되지 않음",
+    missingContractAddress: "REACT_APP_CONTRACT_ADDRESS 누락",
+    dailyLimitReached: "오늘 추첨 횟수가 모두 소진되었습니다",
+    queryRemainingFailed: "남은 횟수 조회 실패, 나중에 다시 시도하세요",
+    transactionFailed: "거래 실패 또는 취소됨",
+    missingLotteryAddress: "REACT_APP_LOTTERY_CODE_ADDRESS 누락",
+    enter8DigitCode: "8자리 추첨 코드를 입력하세요",
+    codeInvalidOrUsed: "추첨 코드가 유효하지 않거나 이미 사용되었습니다",
+    codeValidationFailed: "초대 코드 확인 실패, 나중에 다시 시도하세요",
+    networkSlowOrDelay: "네트워크가 느리거나 이벤트 지연, 페이지가 전환되지 않으면 나중에 다시 시도하세요.",
+    generateShareFailed: "공유 이미지 생성 실패, 다시 시도하세요",
+    installMetamask: "MetaMask 또는 기타 Web3 지갑을 설치하세요",
+    networkSwitched: (chainName) => `${chainName}(으)로 성공적으로 전환했습니다`,
+    networkNotAdded: (chainName) => `네트워크 ${chainName}이(가) 아직 추가되지 않았습니다. 추가 시도 중...`,
+    networkAddSuccess: (chainName) => `네트워크 ${chainName} 추가 성공!`,
+    networkAddRejected: "사용자가 네트워크 추가를 거부했거나 작업 실패",
+    networkSwitchFailed: "네트워크 전환 실패, 지갑 설정을 확인하세요",
+    // Share Image
+    shareImageSubtitle: "Gluck에서 행운을, S2 시즌이 기다립니다",
+    shareImageScan: "스캔하여 Gluck 참여",
   },
 };
 
@@ -491,7 +635,7 @@ function ConfettiAnimation({ show }) {
 }
 
 // ---- Share image ----
-async function generateShareImage(prize) {
+async function generateShareImage(prize, t) {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
   canvas.width = 800; canvas.height = 1000;
@@ -500,17 +644,21 @@ async function generateShareImage(prize) {
   ctx.fillStyle = gradient; ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = "#065f46"; ctx.font = "bold 48px system-ui, -apple-system, Segoe UI, Roboto"; ctx.textAlign = "center";
   ctx.fillText("Zeta Gluck Season 2", canvas.width / 2, 120);
-  const prizeText = prize.label || (prize.value > 0 ? `${prize.value} ZETA` : "谢谢参与");
-  ctx.fillStyle = "#047857"; ctx.font = "bold 36px system-ui, -apple-system, Segoe UI, Roboto"; ctx.fillText("🎉 恭喜获得", canvas.width / 2, 220);
+  const prizeText = prize.label || (prize.value > 0 ? `${prize.value} ZETA` : t.thankYouParticipation);
+  const congratsText = prize.value > 0 ? t.congrats(prizeText) : t.thankYouParticipation;
+  ctx.fillStyle = "#047857"; ctx.font = "bold 36px system-ui, -apple-system, Segoe UI, Roboto"; 
+  ctx.fillText(congratsText.substring(0, 20), canvas.width / 2, 220);
   ctx.fillStyle = "#059669"; ctx.font = "bold 42px system-ui, -apple-system, Segoe UI, Roboto"; ctx.fillText(prizeText, canvas.width / 2, 300);
-  ctx.fillStyle = "#374151"; ctx.font = "bold 28px system-ui, -apple-system, Segoe UI, Roboto"; ctx.fillText("好运就在Gluck，S2赛季等你来", canvas.width / 2, 400);
+  ctx.fillStyle = "#374151"; ctx.font = "bold 28px system-ui, -apple-system, Segoe UI, Roboto"; 
+  ctx.fillText(t.shareImageSubtitle || "Good luck at Gluck, S2 awaits you", canvas.width / 2, 400);
   try {
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent('https://zeta-gluck.vercel.app/')}`;
     const qrImg = new Image(); qrImg.crossOrigin = 'anonymous';
     return new Promise((resolve) => {
       qrImg.onload = () => {
         ctx.drawImage(qrImg, canvas.width / 2 - 100, 500, 200, 200);
-        ctx.fillStyle = '#6b7280'; ctx.font = '20px system-ui, -apple-system, Segoe UI, Roboto'; ctx.fillText('扫码参与 Gluck', canvas.width / 2, 750);
+        ctx.fillStyle = '#6b7280'; ctx.font = '20px system-ui, -apple-system, Segoe UI, Roboto'; 
+        ctx.fillText(t.shareImageScan || 'Scan to join Gluck', canvas.width / 2, 750);
         ctx.fillStyle = '#10b981'; ctx.font = 'bold 24px system-ui, -apple-system, Segoe UI, Roboto'; ctx.fillText('ZetaChain', canvas.width / 2, 850);
         resolve(canvas.toDataURL('image/png'));
       };
@@ -518,14 +666,15 @@ async function generateShareImage(prize) {
         ctx.fillStyle = '#065f46'; ctx.fillRect(canvas.width / 2 - 100, 500, 200, 200);
         ctx.fillStyle = '#ffffff'; ctx.font = 'bold 16px system-ui, -apple-system, Segoe UI, Roboto';
         ctx.fillText('QR Code', canvas.width / 2, 580); ctx.fillText('zeta-gluck.vercel.app', canvas.width / 2, 610);
-        ctx.fillStyle = '#6b7280'; ctx.font = '20px system-ui, -apple-system, Segoe UI, Roboto'; ctx.fillText('扫码参与 Gluck', canvas.width / 2, 750);
+        ctx.fillStyle = '#6b7280'; ctx.font = '20px system-ui, -apple-system, Segoe UI, Roboto'; 
+        ctx.fillText(t.shareImageScan || 'Scan to join Gluck', canvas.width / 2, 750);
         ctx.fillStyle = '#10b981'; ctx.font = 'bold 24px system-ui, -apple-system, Segoe UI, Roboto'; ctx.fillText('ZetaChain', canvas.width / 2, 850);
         resolve(canvas.toDataURL('image/png'));
       };
       qrImg.src = qrUrl;
     });
   } catch (e) {
-    console.error('生成分享图片失败:', e);
+    console.error('[generateShareImage] Failed:', e);
     return canvas.toDataURL('image/png');
   }
 }
@@ -552,7 +701,7 @@ function ReceiptAnimation({ show, t }) {
 }
 
 // ---- Luck code modal ----
-function LuckModal({ show, onClose, onConfirm, luckCode }) {
+function LuckModal({ show, onClose, onConfirm, luckCode, t }) {
   const [inputCode, setInputCode] = useState("");
   const [isValidating, setIsValidating] = useState(false);
 
@@ -576,18 +725,18 @@ function LuckModal({ show, onClose, onConfirm, luckCode }) {
         <div className="p-6">
           <div className="text-center mb-6">
             <div className="text-4xl mb-2">🍀</div>
-            <h3 className="text-xl font-bold text-slate-800 mb-2">输入来自KOL的好运符</h3>
-            <p className="text-sm text-slate-600">请输入8位随机字母或数字</p>
+            <h3 className="text-xl font-bold text-slate-800 mb-2">{t.luckModalTitle}</h3>
+            <p className="text-sm text-slate-600">{t.luckModalDesc}</p>
           </div>
           <div className="mb-4">
-            <input type="text" value={inputCode} onChange={(e) => setInputCode(e.target.value.toUpperCase())} placeholder="输入8位好运符" maxLength={8} className="w-full px-4 py-3 border border-slate-300 rounded-xl text-center text-lg font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500" />
+            <input type="text" value={inputCode} onChange={(e) => setInputCode(e.target.value.toUpperCase())} placeholder={t.luckModalPlaceholder} maxLength={8} className="w-full px-4 py-3 border border-slate-300 rounded-xl text-center text-lg font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500" />
             <div className="flex justify-between items-center mt-2">
-              <span className="text-xs text-slate-500">{inputCode.length}/8 位</span>
+              <span className="text-xs text-slate-500">{t.luckModalCharCount(inputCode.length)}</span>
             </div>
           </div>
           <div className="flex gap-3">
-            <button onClick={()=>{onClose();setInputCode("")}} className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition-colors">取消</button>
-            <button onClick={handleSubmit} disabled={inputCode.length !== 8 || isValidating} className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl font-medium disabled:opacity-50">{isValidating ? '验证中...' : '确认'}</button>
+            <button onClick={()=>{onClose();setInputCode("")}} className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition-colors">{t.luckModalCancel}</button>
+            <button onClick={handleSubmit} disabled={inputCode.length !== 8 || isValidating} className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl font-medium disabled:opacity-50">{isValidating ? t.luckModalValidating : t.luckModalConfirm}</button>
           </div>
         </div>
       </div>
@@ -597,7 +746,7 @@ function LuckModal({ show, onClose, onConfirm, luckCode }) {
 
 // ---- GiftCard ----
 function GiftCard({ prize, t, isRevealed = false, isLuckMode = false }) {
-  const title = prize.label || (prize.value > 0 ? `${prize.value} ZETA` : (t.sorry.includes('谢谢') ? '谢谢参与' : 'Better luck next time'));
+  const title = prize.label || (prize.value > 0 ? `${prize.value} ZETA` : t.thankYouParticipation);
   return (
     <div className="w-full">
       <div className={`mx-auto w-full max-w-[360px] rounded-2xl border p-4 shadow-sm transition-all duration-500 ${isRevealed ? 'border-gray-300 bg-gray-100' : 'border-slate-200 bg-white'}`}>
@@ -605,7 +754,7 @@ function GiftCard({ prize, t, isRevealed = false, isLuckMode = false }) {
           <span>{t.giftFrom}</span>
         </div>
         <div className={`text-center text-2xl font-semibold mb-3 ${isRevealed ? 'text-gray-600' : 'text-slate-900'}`}>ZetaChain</div>
-        <div className={`text-center mb-4 ${isRevealed ? 'text-gray-500' : (isLuckMode ? 'text-purple-600' : 'text-emerald-600')}`}>{isLuckMode ? 'Boost已使用' : t.checkWin}</div>
+        <div className={`text-center mb-4 ${isRevealed ? 'text-gray-500' : (isLuckMode ? 'text-purple-600' : 'text-emerald-600')}`}>{isLuckMode ? t.boostUsed : t.checkWin}</div>
         <div className={`rounded-xl border-2 p-4 ${isRevealed ? 'border-gray-300 bg-gray-50' : 'border-slate-200 bg-white'}`}>
           <div className="mx-auto max-w-[320px]">
             <div className={`rounded-xl border p-4 min-h-[220px] flex flex-col items-center justify-center ${isRevealed ? 'border-gray-300 bg-gray-100' : 'border-slate-200 bg-white'}`}>
@@ -615,7 +764,7 @@ function GiftCard({ prize, t, isRevealed = false, isLuckMode = false }) {
           </div>
         </div>
         <div className={`mt-4 rounded-xl p-3 text-center ${isRevealed ? 'bg-gray-200 text-gray-600' : 'bg-emerald-50 text-emerald-700'}`}>
-          <a href="https://x.com/ZetaChain_CH" target="_blank" rel="noopener noreferrer" className="hover:underline">关注推特 @ZetaChain_CH 好运翻倍</a>
+          <a href="https://x.com/ZetaChain_CH" target="_blank" rel="noopener noreferrer" className="hover:underline">{t.followTwitter}</a>
         </div>
       </div>
     </div>
@@ -640,9 +789,9 @@ function MainApp() {
   const [chainInv, setChainInv] = useState(null); // { amounts, probabilities, maxSupplies, remaining, unlimited }
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertMsg, setAlertMsg] = useState("");
-  const [alertTitle, setAlertTitle] = useState("提示");
-  const triggerAlert = (message, title = '提示') => {
-    setAlertTitle(title);
+  const [alertTitle, setAlertTitle] = useState("");
+  const triggerAlert = (message, title) => {
+    setAlertTitle(title || t.alertDefault);
     setAlertMsg(message);
     setAlertOpen(true);
   };
@@ -673,14 +822,12 @@ function MainApp() {
         ]);
         setRemainingDrawsToday(Number(remaining));
         setMaxDrawsPerDay(Number(max));
-      } catch (e) {
-        console.warn('加载剩余次数失败', e);
+        } catch (e) {
+        console.warn('[getRemainingDraws] failed', e);
         setRemainingDrawsToday(null);
       }
     })();
-  }, [config, address]);
-
-  // 读取链上库存信息
+  }, [config, address]);  // 读取链上库存信息
   async function fetchInventory() {
     try {
       const contractAddress = process.env.REACT_APP_CONTRACT_ADDRESS;
@@ -726,7 +873,7 @@ function MainApp() {
 
   async function onConnectWallet() {
     const preferred = connectors.find((c) => c.id === "injected") || connectors[0];
-    if (!preferred) { triggerAlert("未检测到浏览器钱包"); return; }
+    if (!preferred) { triggerAlert(t.walletNotDetected); return; }
     await connectAsync({ connector: preferred });
   }
 
@@ -803,14 +950,13 @@ function MainApp() {
           } catch {}
         }
         if (!resolved) {
-          // 仍未解析到事件，提示用户稍后在区块确认完成后重试
-          setStage('idle'); // 关闭出票动画
-          triggerAlert('网络较慢或事件延迟，若页面未跳转，请稍后点击再试。', '提示');
+          setStage('idle');
+          triggerAlert(t.networkSlowOrDelay);
         }
       } catch (e) {
         console.warn('[fallback] decode receipt logs failed', e);
-        setStage('idle'); // 关闭出票动画
-        triggerAlert('网络较慢或事件延迟，若页面未跳转，请稍后点击再试。', '提示');
+        setStage('idle');
+        triggerAlert(t.networkSlowOrDelay);
       }
     }, 20000); // 20s 超时兜底
   }
@@ -821,23 +967,23 @@ function MainApp() {
       // 连接钱包（如未连接）
       if (!isConnected) {
         const preferred = connectors.find((c) => c.id === "injected") || connectors[0];
-        if (!preferred) { triggerAlert("未检测到浏览器钱包"); return; }
+        if (!preferred) { triggerAlert(t.walletNotDetected); return; }
         await connectAsync({ connector: preferred });
       }
 
       const contractAddress = process.env.REACT_APP_CONTRACT_ADDRESS;
-      if (!contractAddress) { triggerAlert('缺少 REACT_APP_CONTRACT_ADDRESS'); return; }
+      if (!contractAddress) { triggerAlert(t.missingContractAddress); return; }
 
       // 检查当前地址剩余抽奖次数
       try {
         const remaining = await getRemainingDraws({ config, contractAddress, userAddress: address });
         if ((remaining ?? 0) === 0) {
-          triggerAlert('今日抽奖次数已用完');
+          triggerAlert(t.dailyLimitReached);
           return;
         }
       } catch (e) {
-        console.error('查询剩余次数失败', e);
-        triggerAlert('查询剩余次数失败，请稍后重试');
+        console.error('[payAndStartNormal] Query remaining draws failed:', e);
+        triggerAlert(t.queryRemainingFailed);
         return;
       }
       setStage('paying');
@@ -846,7 +992,7 @@ function MainApp() {
       // 后续由事件回调推进到刮奖阶段
     } catch (e) {
       console.error('participateAndDraw failed', e);
-      triggerAlert(e?.shortMessage || e?.message || '交易失败或已取消');
+      triggerAlert(e?.shortMessage || e?.message || t.transactionFailed);
       setStage('idle');
     }
   }
@@ -857,56 +1003,54 @@ function MainApp() {
       // 连接钱包（如未连接）
       if (!isConnected) {
         const preferred = connectors.find((c) => c.id === "injected") || connectors[0];
-        if (!preferred) { triggerAlert("未检测到浏览器钱包"); return; }
+        if (!preferred) { triggerAlert(t.walletNotDetected); return; }
         await connectAsync({ connector: preferred });
       }
 
       const contractAddress = process.env.REACT_APP_CONTRACT_ADDRESS;
-      if (!contractAddress) { triggerAlert('缺少 REACT_APP_CONTRACT_ADDRESS'); return; }
+      if (!contractAddress) { triggerAlert(t.missingContractAddress); return; }
 
       // 检查当前地址剩余抽奖次数
       try {
         const remaining = await getRemainingDraws({ config, contractAddress, userAddress: address });
         if ((remaining ?? 0) === 0) {
-          triggerAlert('今日抽奖次数已用完');
+          triggerAlert(t.dailyLimitReached);
           return;
         }
       } catch (e) {
-        console.error('查询剩余次数失败', e);
-        triggerAlert('查询剩余次数失败，请稍后重试');
+        console.error('[payAndStartBoosted] Query remaining draws failed:', e);
+        triggerAlert(t.queryRemainingFailed);
         return;
       }
 
       // 邀请码校验（存在且未使用）
       const raw = luckCode.current?.trim();
-      if (!raw) { triggerAlert('请输入8位抽奖码'); return; }
+      if (!raw) { triggerAlert(t.enter8DigitCode); return; }
       const managerAddress = process.env.REACT_APP_LOTTERY_CODE_ADDRESS;
-      if (!managerAddress) { triggerAlert('缺少 REACT_APP_LOTTERY_CODE_ADDRESS'); return; }
+      if (!managerAddress) { triggerAlert(t.missingLotteryAddress); return; }
       const codeHash = codeStringToHash(raw);
       try {
         const valid = await isLotteryCodeValid({ config, managerAddress, codeHash });
-        console.log('Boost校验', valid, raw, codeHash);
+        console.log('[payAndStartBoosted] Code validation:', valid, raw, codeHash);
         if (!valid) { 
-          setAlertTitle('提示');
-          setAlertMsg('抽奖码无效或已被使用');
-          setAlertOpen(true);
+          triggerAlert(t.codeInvalidOrUsed);
           luckCode.current = '';
           setIsLuckMode(false);
           return; }
-      } catch (e) { console.error('校验邀请码失败', e); triggerAlert('校验邀请码失败，请稍后重试'); return; }
+      } catch (e) { console.error('[payAndStartBoosted] Code validation failed:', e); triggerAlert(t.codeValidationFailed); return; }
 
       setStage('paying');
       await startOnChainDraw(contractAddress, codeHash);
       // 后续由事件回调推进到刮奖阶段
     } catch (e) {
       console.error('participateAndDraw boosted failed', e);
-      triggerAlert(e?.shortMessage || e?.message || '交易失败或已取消');
+      triggerAlert(e?.shortMessage || e?.message || t.transactionFailed);
       setStage('idle');
     }
   }
 
   function onRevealed() {
-    console.log("揭晓",prize)
+    console.log('[onRevealed] Prize revealed:', prize);
     setStage("revealed");
     setInventory((prev) => consumeInventory(prev, prize.key));
     if (prize.value > 0 || prize.label) { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 2000); }
@@ -932,11 +1076,11 @@ function MainApp() {
   async function handleShare() {
     setIsGeneratingShare(true);
     try {
-      const imageDataURL = await generateShareImage(prize);
+      const imageDataURL = await generateShareImage(prize, t);
       const link = document.createElement('a');
       link.download = `zeta-gluck-${prize.value > 0 ? prize.value : 'participation'}-${Date.now()}.png`;
       link.href = imageDataURL; document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    } catch (e) { console.error('生成分享图片失败:', e); triggerAlert('生成分享图片失败，请重试'); }
+    } catch (e) { console.error('[handleShare] Generate share image failed:', e); triggerAlert(t.generateShareFailed); }
     finally { setIsGeneratingShare(false); }
   }
 
@@ -961,9 +1105,8 @@ function MainApp() {
   };
 
   async function addAndSwitchNetwork(networkConfig) {
-    // 检查是否安装了 MetaMask 或其他兼容钱包
     if (typeof window.ethereum === 'undefined') {
-      triggerAlert('请安装 MetaMask 或其他 Web3 钱包');
+      triggerAlert(t.installMetamask);
       return;
     }
   
@@ -973,12 +1116,12 @@ function MainApp() {
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: networkConfig.chainId }],
       });
-      triggerAlert(`成功切换到 ${networkConfig.chainName}`);
+      triggerAlert(t.networkSwitched(networkConfig.chainName));
   
     } catch (switchError) {
       // 检查错误代码，4902 表示网络未添加
       if (switchError.code === 4902) {
-        console.log(`网络 ${networkConfig.chainName} 尚未添加，正在尝试添加...`);
+        console.log(t.networkNotAdded(networkConfig.chainName));
         
         // 2. 尝试添加网络
         try {
@@ -987,7 +1130,7 @@ function MainApp() {
             params: [networkConfig],
           });
           
-          triggerAlert(`网络 ${networkConfig.chainName} 添加成功！`);
+          triggerAlert(t.networkAddSuccess(networkConfig.chainName));
           
           // 可选：添加成功后再次尝试切换
           await window.ethereum.request({
@@ -996,14 +1139,12 @@ function MainApp() {
           });
   
         } catch (addError) {
-          // 用户拒绝添加网络，或其他添加错误
-          console.error('添加网络失败或用户拒绝:', addError);
-          triggerAlert('用户拒绝添加网络或操作失败');
+          console.error('[addAndSwitchNetwork] Add network failed or user rejected:', addError);
+          triggerAlert(t.networkAddRejected);
         }
       } else {
-        // 其他切换错误（如用户拒绝切换）
-        console.error('切换网络失败:', switchError);
-        triggerAlert('切换网络失败，请检查您的钱包设置');
+        console.error('[addAndSwitchNetwork] Switch network failed:', switchError);
+        triggerAlert(t.networkSwitchFailed);
       }
     }
   }
@@ -1036,20 +1177,20 @@ function MainApp() {
           {isConnected ? (
             <>
               <span className="text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 font-mono" title={address}>{shortAddr(address)}</span>
-              <button  className="text-[11px] px-2 py-0.5 rounded border border-purple-300 text-purple-700 hover:bg-purple-50">请切换到 Zeta Mainnet</button>
-              <button onClick={() => disconnect()} className="text-[11px] px-2 py-0.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-50">断开连接</button>
+              <button onClick={switchToZetaMainnet} className="text-[11px] px-2 py-0.5 rounded border border-purple-300 text-purple-700 hover:bg-purple-50">{t.switchToZeta}</button>
+              <button onClick={() => disconnect()} className="text-[11px] px-2 py-0.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-50">{t.disconnect}</button>
             </>
           ) : (
-            <button onClick={onConnectWallet} className="text-[11px] px-2 py-0.5 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-50">连接钱包</button>
+            <button onClick={onConnectWallet} className="text-[11px] px-2 py-0.5 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-50">{t.connectWallet}</button>
           )}
         </div>
 
         <section className={`rounded-3xl border-2 p-6 sm:p-8 shadow-lg mb-6 relative overflow-hidden ${isLuckMode ? 'bg-gradient-to-br from-purple-50 via-white to-purple-50 ring-2 ring-purple-100/60' : 'bg-gradient-to-br from-emerald-50 via-white to-emerald-50 ring-2 ring-emerald-100/60'}`}>
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
           <div className="mb-6 text-center relative z-10">
-            <div className={`text-[12px] tracking-widest font-bold uppercase mb-2 ${isLuckMode ? 'text-purple-700/90' : 'text-emerald-700/90'}`}>{isLuckMode ? '感谢您的支持🙏' : t.primaryLabel}</div>
+            <div className={`text-[12px] tracking-widest font-bold uppercase mb-2 ${isLuckMode ? 'text-purple-700/90' : 'text-emerald-700/90'}`}>{isLuckMode ? t.supportThanks : t.primaryLabel}</div>
             <h2 className={`text-2xl sm:text-3xl font-bold mb-3 ${isLuckMode ? 'text-purple-800' : 'text-slate-900'}`}>
-              {isLuckMode ? '好运boost中🍀' : (
+              {isLuckMode ? t.boostActive : (
                 <TypewriterText texts={{ zh: ["Gluck一下", "好运满满"], en: ["Gluck it", "Good luck"], ko: ["Gluck 해보기", "행운 가득"] }} lang={lang} />
               )}
             </h2>
@@ -1058,7 +1199,7 @@ function MainApp() {
 
           {stage === 'idle' && (
             <div className="flex flex-col items-center gap-4 relative z-10">
-              <button onClick={() => (isLuckMode ? payAndStartBoosted() : payAndStartNormal())} disabled={isLuckMode && !luckCodeUsed} className={`px-8 py-4 rounded-2xl font-bold text-lg shadow-lg transition-all ${isLuckMode && !luckCodeUsed ? 'bg-gray-400 text-gray-600 cursor-not-allowed' : 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white'}`}>{isLuckMode ? (luckCodeUsed ? t.draw : '先确认抽奖码') : t.draw}</button>
+              <button onClick={() => (isLuckMode ? payAndStartBoosted() : payAndStartNormal())} disabled={isLuckMode && !luckCodeUsed} className={`px-8 py-4 rounded-2xl font-bold text-lg shadow-lg transition-all ${isLuckMode && !luckCodeUsed ? 'bg-gray-400 text-gray-600 cursor-not-allowed' : 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white'}`}>{isLuckMode ? (luckCodeUsed ? t.draw : t.confirmCodeFirst) : t.draw}</button>
               <div className="inline-flex items-center gap-2 bg-emerald-100 text-emerald-800 px-4 py-2 rounded-full text-sm font-semibold">
                 <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
                 {(() => {
@@ -1088,9 +1229,9 @@ function MainApp() {
             <div className="flex flex-col items-center gap-6">
               <GiftCard prize={prize} t={t} isRevealed={true} isLuckMode={isLuckMode} />
               <div className="flex gap-4">
-                <button onClick={handleShare} disabled={isGeneratingShare} className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 text-white text-sm font-semibold disabled:opacity-50">{isGeneratingShare ? '生成中...' : t.shareJoy}</button>
+                <button onClick={handleShare} disabled={isGeneratingShare} className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 text-white text-sm font-semibold disabled:opacity-50">{isGeneratingShare ? t.generating : t.shareJoy}</button>
                 <button onClick={reset} className="px-6 py-3 rounded-xl bg-gradient-to-r from-slate-700 to-slate-800 text-white text-sm font-semibold">{t.tryAgain}</button>
-                <button onClick={() => { if (isLuckMode) { setIsLuckMode(false); setLuckCodeUsed(false);  } else { setShowLuckModal(true); } }} className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-purple-700 text-white text-sm font-semibold">好运翻倍</button>
+                <button onClick={() => { if (isLuckMode) { setIsLuckMode(false); setLuckCodeUsed(false);  } else { setShowLuckModal(true); } }} className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-purple-700 text-white text-sm font-semibold">{t.luckBoost}</button>
               </div>
             </div>
           )}
@@ -1123,7 +1264,7 @@ function MainApp() {
                   );
                 })
               ) : (
-                <div className="text-sm text-slate-500">正在读取链上库存…</div>
+                <div className="text-sm text-slate-500">{t.loadingInventory}</div>
               )}
             </div>
           </div>
@@ -1132,8 +1273,8 @@ function MainApp() {
 
       <ReceiptAnimation show={stage === 'paying'} t={t} />
       <ConfettiAnimation show={showConfetti} />
-      <LuckModal show={showLuckModal} onClose={() => setShowLuckModal(false)} onConfirm={handleLuckConfirm} luckCode={luckCode} />
-      <AlertModal show={alertOpen} title={alertTitle} message={alertMsg} onClose={() => setAlertOpen(false)} />
+      <LuckModal show={showLuckModal} onClose={() => setShowLuckModal(false)} onConfirm={handleLuckConfirm} luckCode={luckCode} t={t} />
+      <AlertModal show={alertOpen} title={alertTitle || t.alertDefault} message={alertMsg} onClose={() => setAlertOpen(false)} t={t} />
 
       <style>{`
         @keyframes shimmer { 0% { transform: translateX(-100%);} 100% { transform: translateX(100%);} }
